@@ -1,0 +1,47 @@
+-------------------------------------------------------------------------------
+-- Title      : Pulse shorten
+-- Project    :
+-------------------------------------------------------------------------------
+-- File       : pulse_shorten.vhd
+-- Author     :   <javierc@correlator6.fnal.gov>
+-- Company    :
+-- Created    : 2025-07-08
+-- Last update: 2025-07-08
+-- Platform   :
+-- Standard   : VHDL'08
+-------------------------------------------------------------------------------
+-- Description: Convert a long pulse to a single clock
+-------------------------------------------------------------------------------
+-- Copyright (c) 2025
+-------------------------------------------------------------------------------
+-- Revisions  :
+-- Date        Version  Author  Description
+-- 2025-07-08  1.0      javierc	Created
+-------------------------------------------------------------------------------
+
+library ieee;
+use ieee.std_logic_1164.all;
+
+entity pulse_shorten is
+
+  port (
+    clk      : in  std_logic;
+    src_in   : in  std_logic;
+    dest_out : out std_logic);
+
+end entity pulse_shorten;
+
+architecture rtl of pulse_shorten is
+  signal reg1 : std_logic := '0';
+begin  -- architecture rtl
+
+p1: process (clk)  is
+begin  -- process p1
+  if rising_edge(clk) then
+    reg1 <= src_in;
+  end if;
+end process p1;
+
+dest_out <= src_in and not reg1;
+
+end architecture rtl;
