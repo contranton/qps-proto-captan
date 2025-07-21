@@ -54,7 +54,7 @@ signal data_fifo_rden_sig: STD_LOGIC;
 signal fifo_sel_sig: STD_LOGIC;
 signal info_fifo_rden_sig: STD_LOGIC;
 signal qw_count: UNSIGNED (7 downto 0);
-signal seq_count: UNSIGNED (7 downto 0);
+signal ctrl_seq_count, data_seq_count: UNSIGNED (7 downto 0);
 signal tx_data_count: UNSIGNED (10 downto 0);
 
 -- BINARY ENCODED state machine: Sreg0
@@ -109,7 +109,10 @@ begin
 			-- Set default values for outputs, signals and variables
 			info_fifo_rden_sig <= '0';
 			data_fifo_rden_sig <= '0';
-			seq_count <= (others => '0');
+
+			ctrl_seq_count <= (others => '0');
+			data_seq_count <= (others => '0');
+			
 			user_trigger <= '0';
 			user_tx_size_in <= (others => '0');
 			qw_count <= (others => '0');
@@ -127,7 +130,12 @@ begin
 					when S7 =>
 						Sreg0 <= txmtdone;
 						user_trigger <= '0';
-						seq_count <= seq_count + 1;
+
+						if (fifo_sel_sig = '0') then
+							ctrl_seq_count <= ctrl_seq_count + 1;
+						else --1
+							data_seq_count <= data_seq_count + 1;
+						end if;
 					when S1 =>
 						Sreg0 <= S2;
 						-- add return code and sequence counter byte to
@@ -205,7 +213,12 @@ begin
 					when trgrd =>
 						if user_tx_enable_out = '1' then
 							Sreg0 <= S5;
-							tx_data <= std_logic_vector(seq_count);
+
+							if (fifo_sel_sig = '0') then
+								tx_data <= std_logic_vector(ctrl_seq_count);
+							else --1
+								tx_data <= std_logic_vector(data_seq_count);
+							end if;
 						elsif -- trigger sent, wait for tx enable
 							user_tx_enable_out = '0' then
 							Sreg0 <= trgrd;

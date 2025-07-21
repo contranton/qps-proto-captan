@@ -53,12 +53,19 @@ begin
 				
 				if BURST_WE = '1' then 
 											
+					clocks_since_send <= (others => '0'); 	
+					
 					if writes_in_curr_burst >= 181 then	
-						writes_in_curr_burst <= (others => '0'); 	 
-						clocks_since_send <= (others => '0'); 
+						writes_in_curr_burst <= (others => '0'); 	 						
 					else							
 						writes_in_curr_burst <= writes_in_curr_burst + 1;
 					end if;	 
+					
+					--allow for case when packet ended and write occurs
+					if (force_packet_old = '0' and BURST_FORCE_PACKET = '1') then						
+						BURST_END_PACKET <= '1';	 -- force end burst packet	 
+						writes_in_curr_burst <= x"01"; -- based on what happens in burst_controller_sm .. this write is first in next packet!
+					end if;
 					
 				else						
 					

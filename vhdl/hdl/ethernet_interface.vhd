@@ -110,9 +110,9 @@ architecture BEHAVIORAL of ethernet_interface is
   signal ots_din, ots_dout : std_logic_vector (63 downto 0);
   signal ots_rden          : std_logic;
   signal ots_ready         : std_logic;
-  signal ots_user_mask     : std_logic := '0';
+  signal ots_user_mask     : std_logic                     := '0';
   signal internal_eth_dout : std_logic_vector (63 downto 0);
-  signal internal_reset    : std_logic := '0';
+  signal internal_reset    : std_logic_vector (1 downto 0) := (others => '0');
   signal reset_mgr_in      : std_logic;
 
   signal arp_announce      : std_logic                     := '0';
@@ -268,7 +268,7 @@ begin
       reset_start => reset_mgr_in,
       reset       => reset);
 
-  reset_out <= reset;
+  reset_out <= reset and (not internal_reset(1));  -- "soft" reset, for not forwarding out of block
   -------- end reset section -----------
 
 
@@ -295,7 +295,7 @@ begin
   ots_dout  <= tx_data when (ots_user_mask = '1') else internal_eth_dout;
   ots_ready <= (not ots_user_mask) or user_ready;  -- ots address space is always ready
 
-  reset_mgr_in <= internal_reset or reset_in;
+  reset_mgr_in <= internal_reset(0) or reset_in;
 
 
   process(MASTER_CLK)
@@ -310,7 +310,7 @@ begin
 
       internal_eth_dout <= (others => '0');
       internal_dout     <= (others => '0');
-      internal_reset    <= '0';
+      internal_reset(0) <= '0';
 
 
       if (ots_wren = '1' and            -- WRITE eth ===========
@@ -345,7 +345,7 @@ begin
         elsif (ots_block_addr = x"B") then
           data_dynamic_mac_resolution <= ots_din(0);
         elsif (ots_block_addr = x"FFFFFFFF") then
-          internal_reset <= ots_din(0);
+          internal_reset <= ots_din(1 downto 0);
         end if;
       elsif (internal_we = '1' and      -- WRITE internal ===========
              unsigned(internal_block_sel) = x"1") then  -- Ethernet block address space
@@ -379,7 +379,7 @@ begin
         elsif (unsigned(internal_addr) = x"B") then
           data_dynamic_mac_resolution <= internal_din(0);
         elsif (unsigned(internal_addr) = x"FFFFFFFF") then
-          internal_reset <= internal_din(0);
+          internal_reset <= internal_din(1 downto 0);
         end if;
       elsif (user_rx_src_capture_for_ctrl = '1') then  -- SPECIAL WRITE for source capture for ctrl ===========
         tx_ctrl_dest_addr <= user_rx_src_addr;

@@ -22,6 +22,10 @@ entity top is
 		  
 		--PHY_RXER     : in    std_logic; 
 		--USER_CLOCK   : in    std_logic; 
+            COINC_PULSE_0_N    : out   std_logic; 
+            COINC_PULSE_0_P    : out   std_logic; 
+            COINC_PULSE_1_N    : out   std_logic; 
+            COINC_PULSE_1_P    : out   std_logic;
           
 	PHY_RESET	: out    std_logic; 
 		
@@ -105,6 +109,11 @@ architecture BEHAVIORAL of top is
 	--    attribute mark_debug of GMII_RX_DV_0_sig : signal is "true";
        
    
+--       component OBUFDS
+--          port ( I : in    std_logic; 
+--                 O : out   std_logic; 
+--                 OB : out   std_logic);
+--       end component;
    
    component OBUF
       port ( I : in    std_logic; 
@@ -167,7 +176,7 @@ begin
 	-- start simple OEI
 	eth_interface : entity work.Ethernet_Interface
 	  port map (b_data(63 downto 0)=>b_data(63 downto 0),
-				b_data_we=>b_data_we,
+				b_data_we=>'0',--b_data_we,
 				PHY_RXD(7 downto 0)=>GMII_RXD_0_sig(7 downto 0),
 				PHY_RX_DV=>GMII_RX_DV_0_sig,
 				PHY_RX_ER=>GMII_RX_ER_0_sig,
@@ -189,8 +198,6 @@ begin
      
 
 	-- start data gen block
-data_gen_block : block
-begin
    dataGenGen : for i in 0 to 0 generate
 		signal reg_cnt : unsigned(63 downto 0) := (others => '0'); -- 1s is infinite
 		signal reg_rate : unsigned(63 downto 0) := (others => '0');  -- delay between 8 clock periods
@@ -247,7 +254,7 @@ begin
 	
 	end generate;	
 	-- end data gen block
-end block data_gen_block;
+   
    
    makeSlowClock : for i in 0 to 0 generate
         signal cnt : unsigned(4 downto 0) := (others => '0');
@@ -331,6 +338,23 @@ end block data_gen_block;
 	OBUF_PHY_TXD1 : OBUF       port map (I=>PHY_TXD_sig(1), O=>PHY_TXD1);    
 	OBUF_PHY_TXD0 : OBUF       port map (I=>PHY_TXD_sig(0), O=>PHY_TXD0);
            
+               
+--    OBUF_COIN_0 : OBUF       port map (I=>MASTER_CLK, O=>COINC_PULSE_0_P);
+--        OBUF_COIN_1 : OBUF       port map (I=>b_data_we, O=>COINC_PULSE_0_N);
+--        OBUF_COIN_2 : OBUF       port map (I=>MASTER_CLK, O=>COINC_PULSE_1_P);
+--            OBUF_COIN_3 : OBUF       port map (I=>b_data_we, O=>COINC_PULSE_1_N);
+    
+           
+    OBUF_COIN_0 : OBUFDS         
+                    generic map (
+                       IOSTANDARD => "DEFAULT", -- Specify the output I/O standard
+                       SLEW => "SLOW")          -- Specify the output slew rate
+                        port map (I=>b_data_we, O=>COINC_PULSE_0_P, OB=>COINC_PULSE_0_N);  
+    OBUF_COIN_1 : OBUFDS
+                    generic map (
+                       IOSTANDARD => "DEFAULT", -- Specify the output I/O standard
+                       SLEW => "SLOW")          -- Specify the output slew rate
+                        port map (I=>b_data_we, O=>COINC_PULSE_1_P, OB=>COINC_PULSE_1_N);   
            
 end BEHAVIORAL;
 

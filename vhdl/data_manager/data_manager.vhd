@@ -290,7 +290,37 @@ begin
 	
 		
 	tx_data_fifo_din <= b_data;		  							
-	rx_fifo_reset_sig <= rx_fifo_reset or reset;
+
+	-- SCRIPT COMMENT OUT -- generate watchdog reset, rx_fifo_watchdog_reset, for rx fifos (to get out of a jam)
+	rx_fifo_gen : for i in 0 to 0 generate
+		signal rx_fifo_watchdog_reset : std_logic := '0';
+		signal rx_fifo_watchdog_cnt : unsigned(15 downto 0) := (others => '1');
+	begin
+	
+		rx_fifo_reset_sig <= rx_fifo_reset or rx_fifo_watchdog_reset or reset;
+	
+		process(MASTER_CLK)
+		begin
+			if (rising_edge(MASTER_CLK)) then
+					
+				if (rx_data_fifo_empty = '0' and  rx_info_fifo_empty = '1' and 
+						rx_fifo_watchdog_cnt > 0) then  
+					-- SCRIPT COMMENT OUT -- potential problem so count down
+					rx_fifo_watchdog_cnt <= rx_fifo_watchdog_cnt - 1; 
+				else
+					-- SCRIPT COMMENT OUT -- reset count 
+					rx_fifo_watchdog_cnt <= (others => '1'); 
+				end if;
+						
+				rx_fifo_watchdog_reset <= '0';
+				if(rx_fifo_watchdog_cnt < 5) then 
+					-- SCRIPT COMMENT OUT -- reset for last 5 counts
+					rx_fifo_watchdog_reset <= '1';
+				end if;
+					
+			end if;
+		end process;
+	end generate;
 				
 				
 				
