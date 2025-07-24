@@ -1,14 +1,25 @@
 # SampleClock is 8MHz
 # FrameClock is SampleClock/4 = 2.00MHz
-create_clock -period 500.000 -name ADC_FRAMECLK [get_ports adc_frame_clk]
+# create_clock -period 500.000 -name ADC_FRAMECLK [get_ports adc_frame_clk]
 # DataClock is FrameClock * 24 (Config = SDR + 4 lanes) =  60MHz
 # Assume SDR with faster clock for higher design flexibility (live SDR/DDR switching).
 # Commented out since clk_wiz_phase_shift overrides
 #create_clock -period 16.667 -name ADC_DATACLK [get_ports adc_data_clk]
 
-set_clock_groups -asynchronous -group [get_clocks -of_objects [get_nets {MASTER_CLK adc_data_clk}]]
+#set_clock_groups -asynchronous -group [get_clocks -of_objects [get_nets {MASTER_CLK adc_data_clk}]]
+#set_clock_groups -asynchronous -group [get_clocks -of_objects [get_nets {MASTER_CLK adc_frame_clk}]]
 
-set_clock_groups -asynchronous -group [get_clocks -of_objects [get_nets {MASTER_CLK adc_frame_clk}]]
+create_generated_clock \
+    -name adc_sample_clk_8mhz \
+    -source [get_pins wiz_adc_clk/clk_out_16] \
+    [get_pins adc_sample_clk_8mhz_reg/Q] \
+    -divide_by 2
+
+create_generated_clock \
+    -name adc_sample_clk_4mhz \
+    -source [get_pins adc_sample_clk_8mhz_reg/Q] \
+    [get_pins adc_sample_clk_4mhz_reg/Q] \
+    -divide_by 2
 
 set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets adc_data_clk_IBUF]
 
