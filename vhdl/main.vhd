@@ -6,7 +6,7 @@
 -- Author : <javierc@correlator6.fnal.gov>
 -- Company :
 -- Created : 2025-05-22
--- Last update: 2025-07-21
+-- Last update: 2025-07-23
 -- Platform :
 -- Standard : VHDL'08
 -------------------------------------------------------------------------------
@@ -68,13 +68,20 @@ architecture rtl of main is
   end record t_phase_shift_if;
 
   signal phase_shift_if : t_phase_shift_if;
+  signal phase_shift_if_done_sync : std_logic;
 
   signal clk      : std_logic;
   signal reset    : std_logic := '0';
   signal resetn    : std_logic := '1';
   signal mb_reset : std_logic := '0';
 
+  signal reset_sync_adc    : std_logic := '0';
+
   signal phy_tx_dbg : t_GEL_PHY_TX;
+
+  signal phy_reset_sig      : std_logic := '1';
+  signal phy_reset_sig_sync : std_logic := '1';
+  signal phy_resetn_sig     : std_logic := '1';
 
   -- Ethernet Interface
   signal reset_in   : std_logic;
@@ -129,9 +136,10 @@ architecture rtl of main is
   signal adc_data_ready_single_clock : std_logic;
 
   -- Selects whether ADC or test data go to ethernet interface
-  signal eth_data_gen_enable : std_logic := '0';
-  signal flip_ddr_polarity   : std_logic := '1';
-  signal data_lanes          : std_logic_vector(1 downto 0);
+  signal eth_data_gen_enable    : std_logic := '0';
+  signal flip_ddr_polarity      : std_logic := '1';
+  signal flip_ddr_polarity_sync : std_logic := '1';
+  signal data_lanes             : std_logic_vector(1 downto 0);
 
   signal adc_data_clk_buf4cdc : std_logic := '0';
 
@@ -175,6 +183,55 @@ begin
       I => adc_data_clk_shift,
       O => adc_data_clk_buf4cdc
       );
+
+  sync_master2adc_reset: xpm_cdc_single
+    generic map(
+      SRC_INPUT_REG => 0,
+      DEST_SYNC_FF => 2
+    )
+    port map(
+      src_clk => MASTER_CLK,
+      src_in => reset,
+      dest_out => reset_sync_adc,
+      dest_clk => adc_data_clk_shift
+    );
+
+
+  sync_master2adc_phase_shift_if_done: xpm_cdc_single
+    generic map(
+      SRC_INPUT_REG => 0,
+      DEST_SYNC_FF => 2
+    )
+    port map(
+      src_clk => MASTER_CLK,
+      src_in => phase_shift_if.done,
+      dest_out => phase_shift_if_done_sync,
+      dest_clk => adc_data_clk_shift
+    );
+
+  sync_vio2adc_flip_ddr_polarity : xpm_cdc_single
+    generic map(
+      SRC_INPUT_REG => 0,
+      DEST_SYNC_FF => 2
+    )
+    port map(
+      src_clk => MASTER_CLK,
+      src_in => flip_ddr_polarity,
+      dest_out => flip_ddr_polarity_sync,
+      dest_clk => adc_data_clk_shift
+    );
+
+  sync_vio2phy_phy_reset: xpm_cdc_single
+    generic map(
+      SRC_INPUT_REG => 0,
+      DEST_SYNC_FF => 2
+    )
+    port map(
+      src_clk => MASTER_CLK,
+      src_in => phy_reset_sig,
+      dest_out => phy_reset_sig_sync,
+      dest_clk => PHY_CLK
+    );
 
   sync_data_clk : xpm_cdc_single
     generic map(
@@ -293,8 +350,8 @@ begin
       FCLK              => adc_frame_clk,
       data_rate         => '0',         -- 0: DDR, 1: SDR
       data_lanes        => "10",        -- 4 lanes
-      flip_ddr_polarity => flip_ddr_polarity,
-      RST               => reset or phase_shift_if.done,
+      flip_ddr_polarity => flip_ddr_polarity_sync,
+      RST               => reset_sync_adc or phase_shift_if_done_sync,
       DRDY              => adc_data_ready,
       DOUT              => ti_adc_output
       );
@@ -319,14 +376,14 @@ begin
       m_axis_tdata   => m_axis_adc_tdata);
 
 
-  ti_serializer_bin_outputs : for ii in 0 to c_NUM_ADC_CHANNELS - 1 generate
-    constant msb        : natural := c_ADC_BITS*(c_NUM_ADC_CHANNELS - ii);
-    constant lsb        : natural := c_ADC_BITS*(c_NUM_ADC_CHANNELS - ii - 1);
-    signal deser_output : std_logic_vector(c_ADC_BITS-1 downto 0);
-  begin
-    deser_output           <= ti_adc_output(msb - 1 downto lsb);
-    adc_output_streams(ii) <= deser_output;
-  end generate;
+--  ti_serializer_bin_outputs : for ii in 0 to c_NUM_ADC_CHANNELS - 1 generate
+--    constant msb        : natural := c_ADC_BITS*(c_NUM_ADC_CHANNELS - ii);
+--    constant lsb        : natural := c_ADC_BITS*(c_NUM_ADC_CHANNELS - ii - 1);
+--    signal deser_output : std_logic_vector(c_ADC_BITS-1 downto 0);
+--  begin
+--    deser_output           <= ti_adc_output(msb - 1 downto lsb);
+--    adc_output_streams(ii) <= deser_output;
+--  end generate;
 
   fifo_bin_outputs : for ii in 0 to c_NUM_ADC_CHANNELS - 1 generate
     constant msb : natural := c_ADC_BITS*(c_NUM_ADC_CHANNELS - ii);
@@ -349,19 +406,18 @@ begin
       sequencer_channel => sequencer_channel
       );
 
-  p_Packetize : process (MASTER_CLK) is
+  p_Packetize : process (all) is
   begin
-    if rising_edge(MASTER_CLK) then
-      with eth_data_gen_enable select
-        eth_data <= sequencer_out when '0',
-                    test_data_out when '1',
-                    (others => '0') when others;
-      packet.timestamp <= timestamp;
-      packet.channel <= sequencer_channel;
-      packet.data <= eth_data;
-      packetized_data <= packet.timestamp & packet.channel & packet.data;
-      packetized_data_valid <= sequencer_valid;
+    if eth_data_gen_enable = '1' then
+      eth_data <= test_data_out; -- test data
+    else
+      eth_data <= sequencer_out; -- serialized adc data
     end if;
+    packet.timestamp <= timestamp;
+    packet.channel <= sequencer_channel;
+    packet.data <= eth_data;
+    packetized_data <= packet.timestamp & packet.channel & packet.data;
+    packetized_data_valid <= sequencer_valid;
   end process p_Packetize;
 
   fifo_master2phy : entity work.fifo_1
@@ -378,7 +434,7 @@ begin
 
   ethernet_interface_1 : entity work.ethernet_interface
     port map (
-      reset_in   => reset_in,
+      reset_in   => phy_reset_sig_sync,
       reset_out  => reset_out,
       rx_addr    => rx_addr,
       rx_data    => rx_data,
@@ -414,9 +470,10 @@ begin
 
   -- Assignments
   reset_in            <= reset;
-  resetn            <= not reset;
+  resetn              <= not reset;
   adc_spi_ctrl.SPI_EN <= '1';
   phy_tx              <= phy_tx_dbg;
+  phy_resetn_sig      <= not (reset_out);
 
   -- Mux sample clock
   -- 8Mhz if sample_rate_select=1, else 4MHz
@@ -431,7 +488,7 @@ begin
 
   phy_reset_buf : OBUF
     port map(
-      I => '1',
+      I => phy_resetn_sig,
       O => PHY_RESET
       );
 
@@ -474,24 +531,24 @@ debug_gen : if c_DEBUG_ENABLE = '1' generate
   ila_1_inst_0 : entity work.ila_1
     port map
     (
-      clk       => MASTER_CLK,
-      probe0(0) => (reset_in),
+      clk       => PHY_CLK,
+      probe0(0) => '0',
       probe1    => ethernet_payload,
       probe2(0) => ethernet_payload_valid,
-      probe3(0) => '0',
+      probe3(0) => phy_resetn_sig,
       probe4    => std_logic_vector(rx_addr),
       probe5    => std_logic_vector(rx_data),
       probe6(0) => rx_wren,
       probe7    => std_logic_vector(tx_data)
       );
 
-  ila_2_inst_0 : entity work.ila_2
-    port map(
-      clk       => FAST_CLK,
-      probe0    => adc_data_fast_sync,
-      probe1(0) => adc_data_clk_fast_sync,
-      probe2(0) => adc_frame_clk_fast_sync
-      );
+  --ila_2_inst_0 : entity work.ila_2
+  --  port map(
+  --    clk       => FAST_CLK,
+  --    probe0    => adc_data_fast_sync,
+  --    probe1(0) => adc_data_clk_fast_sync,
+  --    probe2(0) => adc_frame_clk_fast_sync
+  --    );
 
   ila_0_inst_0 : entity work.ila_0
     port map(
@@ -511,33 +568,44 @@ debug_gen : if c_DEBUG_ENABLE = '1' generate
       probe12    => m_axis_adc_tdata
       );
 
-  ila_0_inst_1 : entity work.ila_0
+--  ila_0_inst_1 : entity work.ila_0
+--    port map(
+--      clk        => adc_data_clk_shift,
+--      probe0     => std_logic_vector(adc_output_streams(0)),
+--      probe1     => std_logic_vector(adc_output_streams(1)),
+--      probe2     => std_logic_vector(adc_output_streams(2)),
+--      probe3     => std_logic_vector(adc_output_streams(3)),
+--      probe4     => std_logic_vector(adc_output_streams(4)),
+--      probe5     => std_logic_vector(adc_output_streams(5)),
+--      probe6     => std_logic_vector(adc_output_streams(6)),
+--      probe7     => std_logic_vector(adc_output_streams(7)),
+--      probe8     => std_logic_vector(adc_data),
+--      probe9(0)  => adc_data_ready_single_clock,
+--      probe10(0) => '0',
+--      probe11(0) => '0', --adc_frame_clk,
+--      probe12    => ti_adc_output
+--      );
+
+  ila_3_inst_0 : entity work.ila_3
     port map(
-      clk        => adc_data_clk_shift,
-      probe0     => std_logic_vector(adc_output_streams(0)),
-      probe1     => std_logic_vector(adc_output_streams(1)),
-      probe2     => std_logic_vector(adc_output_streams(2)),
-      probe3     => std_logic_vector(adc_output_streams(3)),
-      probe4     => std_logic_vector(adc_output_streams(4)),
-      probe5     => std_logic_vector(adc_output_streams(5)),
-      probe6     => std_logic_vector(adc_output_streams(6)),
-      probe7     => std_logic_vector(adc_output_streams(7)),
-      probe8     => std_logic_vector(adc_data),
-      probe9(0)  => adc_data_ready_single_clock,
-      probe10(0) => '0',
-      probe11(0) => adc_frame_clk,
-      probe12    => ti_adc_output
+      clk       => MASTER_CLK,
+      probe0(0) => m_axis_adc_tvalid,
+      probe1(0) => packetized_data_ready,
+      probe2    => flatten_array(fifo_output_streams),
+      probe3(0) => sequencer_valid,
+      probe4    => sequencer_out,
+      probe5    => sequencer_channel
       );
 
   vio_dbg : entity work.vio_0
     port map(
       clk           => MASTER_CLK,
-      probe_in0(0)  => adc_sample_clk_16mhz_prebuf,
+      probe_in0(0)  => '0',
       probe_in1(0)  => '0',
-      probe_in2(0)  => adc_frame_clk,
-      probe_in3(0)  => adc_data_clk,
-      probe_in4(0)  => adc_data_ready,
-      probe_in5(0)  => clk_wiz_phase_shift_locked,
+      probe_in2(0)  => '0', --adc_frame_clk,
+      probe_in3(0)  => '0', --adc_data_clk,
+      probe_in4(0)  => '0', --adc_data_ready,
+      probe_in5(0)  => '0',
       probe_out0(0) => eth_data_gen_enable,
       probe_out1(0) => reset,
       probe_out2(0) => flip_ddr_polarity,
@@ -545,7 +613,7 @@ debug_gen : if c_DEBUG_ENABLE = '1' generate
       probe_out4(0) => phase_shift_forward_vio,
       probe_out5(0) => phase_shift_backward_vio,
       probe_out6(0) => clk_wiz_phase_shift_reset,
-      probe_out7(0) => open
+      probe_out7(0) => phy_reset_sig
       );
 
   end generate debug_gen;

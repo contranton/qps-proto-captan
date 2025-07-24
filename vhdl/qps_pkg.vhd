@@ -6,7 +6,7 @@
 -- Author : <javierc@correlator6.fnal.gov>
 -- Company :
 -- Created : 2025-05-22
--- Last update: 2025-07-21
+-- Last update: 2025-07-22
 -- Platform :
 -- Standard : VHDL'08
 -------------------------------------------------------------------------------
@@ -81,9 +81,21 @@ package qps_pkg is
   --function fix_deserializer_bits( x : std_logic_vector(23 downto 0) )
     --return std_logic_vector(23 downto 0);
 
+  function flatten_array(input : t_ADC_BUS) return std_logic_vector;
+
 end package qps_pkg;
 
 package body qps_pkg is
+
+  function flatten_array(input : t_ADC_BUS) return std_logic_vector is
+    variable result : std_logic_vector(input'length * input(0)'length - 1 downto 0);
+    constant word_width : integer := input(0)'length;
+begin
+    for i in input'range loop
+        result((i+1)*word_width - 1 downto i*word_width) := input(i);
+    end loop;
+    return result;
+  end function;
 
   --function fix_deserializer_bits(
     --x : std_logic_vector(23 downto 0)
