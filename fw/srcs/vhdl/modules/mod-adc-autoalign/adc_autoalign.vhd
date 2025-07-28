@@ -1,4 +1,15 @@
 -------------------------------------------------------------------------------
+--
+--        _-    -_
+--       |  |  |  |            Fermi National Accelerator Laboratory
+--       |  |  |  |
+--       |  |  |  |        Operated by Fermi Forward Discovery Group, LLC
+--       |  |  |  |        for the Department of Energy under contract
+--       /  |  |   \                    89243024CSC000002
+--      /   /   \   \
+--     /   /     \   \
+--     ----       ----
+-------------------------------------------------------------------------------
 -- Title : ADC Autoalign
 -- Project : QPS (Quench Prediction System) Prototype for APS-TD
 -------------------------------------------------------------------------------
@@ -6,7 +17,7 @@
 -- Author : Javier Contreras 52425N
 -- Division : CSAID/RTPS/DIS
 -- Created : 2025-07-11
--- Last update: 2025-07-14
+-- Last update: 2025-07-28
 -- Platform :
 -- Standard : VHDL'08
 -------------------------------------------------------------------------------
