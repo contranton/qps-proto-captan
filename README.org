@@ -1,0 +1,9 @@
+#+title: QPS Prototype design for CAPTAN+ w/ADS9813EVM
+
+* Quick-start
+
+Navigate to =fw= and source =runme.sh=. This will create the Vivado project directly under the =fw= directory.
+
+* Architecture
+
+The design connects two principal subsystems: the ADS9813EVM evaluation board, and the GEL ethernet board.
