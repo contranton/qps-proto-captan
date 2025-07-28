@@ -948,7 +948,6 @@ proc create_hier_cell_local_mem { parentCell nameHier } {
 
   # Create instance: axi_gpio_0, and set properties
   set axi_gpio_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_gpio:2.0 axi_gpio_0 ]
-  set_property CONFIG.C_ALL_OUTPUTS {1} $axi_gpio_0
 
 
   # Create interface connections
