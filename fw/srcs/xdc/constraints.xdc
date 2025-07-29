@@ -11,7 +11,7 @@
 
 create_generated_clock \
     -name adc_sample_clk_8mhz \
-    -source [get_pins wiz_adc_clk/clk_out_16] \
+    -source [get_pins pll_MainClocks/clk_out_16] \
     [get_pins adc_sample_clk_8mhz_reg/Q] \
     -divide_by 2
 
@@ -30,8 +30,8 @@ set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets adc_data_clk_IBUF]
 #set_property IODELAY_GROUP DATA_2 [get_cells delay_inst/gen_delay[2].*]
 #set_property IODELAY_GROUP DATA_3 [get_cells delay_inst/gen_delay[3].*]
 
-set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets phase_shift/inst/clk_in_48_clk_wiz_phase_shift]
-set_property CLOCK_DEDICATED_ROUTE BACKBONE [get_nets wiz_phy_clk/inst/clk_in_125_clk_wiz_phy2adc]
+set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets pll_PhaseShift/inst/clk_in_48_clk_wiz_phase_shift]
+set_property CLOCK_DEDICATED_ROUTE BACKBONE [get_nets pll_PhyClock/inst/clk_in_125_clk_wiz_phy2adc]
 
 # User LED
 set_property PACKAGE_PIN J3 [get_ports user_led]

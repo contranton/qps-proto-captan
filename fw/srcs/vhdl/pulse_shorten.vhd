@@ -1,18 +1,28 @@
 -------------------------------------------------------------------------------
--- Title      : Pulse shorten
+--
+--        _-    -_
+--       |  |  |  |            Fermi National Accelerator Laboratory
+--       |  |  |  |
+--       |  |  |  |        Operated by Fermi Forward Discovery Group, LLC
+--       |  |  |  |        for the Department of Energy under contract
+--       /  |  |   \                    89243024CSC000002
+--      /   /   \   \
+--     /   /     \   \
+--     ----       ----
+-------------------------------------------------------------------------------
+-- Title      : Pulse shortener
 -- Project    :
 -------------------------------------------------------------------------------
 -- File       : pulse_shorten.vhd
 -- Author     :   <javierc@correlator6.fnal.gov>
--- Company    :
+-- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-07-08
--- Last update: 2025-07-08
--- Platform   :
--- Standard   : VHDL'08
+-- Last update: 2025-07-29
+-- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
--- Description: Convert a long pulse to a single clock
+-- Description: Converts a long input pulse to single-clock length
 -------------------------------------------------------------------------------
--- Copyright (c) 2025
+-- Copyright (c) 2025 Fermi Forward Discovery Group, LLC
 -------------------------------------------------------------------------------
 -- Revisions  :
 -- Date        Version  Author  Description
