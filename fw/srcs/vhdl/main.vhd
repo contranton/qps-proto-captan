@@ -117,6 +117,11 @@ architecture rtl of main is
   -- </.>
 
 
+  -- <SPI interfaces>
+  signal if_AdcSpiCtrl_Microblaze : t_ADC_CTRL;
+  signal if_AdcSpiCtrl_Hdl        : t_ADC_CTRL;
+  signal if_SpiHdlManager         : t_SPI_MGT;
+
 --  __  __       _             _       _           __ _
 -- |  \/  | __ _(_)_ __     __| | __ _| |_ __ _   / _| | _____      __
 -- | |\/| |/ _` | | '_ \   / _` |/ _` | __/ _` | | |_| |/ _ \ \ /\ / /
@@ -190,6 +195,8 @@ architecture rtl of main is
   -- Selector for sample clock mux (4MHz/8MHz)
   signal ctrl_SampleRateSelect : std_logic := '0';
 
+  -- Selects whether Microblaze runs SPI or the HDL
+  signal ctrl_SelectSpiSource : std_logic := '0';
 
 --  ____       _
 -- |  _ \  ___| |__  _   _  __ _
@@ -225,8 +232,6 @@ architecture rtl of main is
   -- Most useful when ADC wasn't yet working. Now deprecated.
   signal ctrl_TestDataEnable : std_logic                               := '0';
   signal sig_TestData        : std_logic_vector(c_ADC_BITS-1 downto 0) := (others => '0');
-
-
 
 begin
 
@@ -280,19 +285,44 @@ begin
   -- </.> --
 
   -- <Microblaze Block Design for SPI + GPIO>
+
+  mod_HdlSpi : entity work.spi_master
+    port map(
+      spi_clk       => clk_MAIN,
+      SPI_EN        => if_AdcSpiCtrl_Hdl.SPI_EN,
+      SPI_CS_Z      => if_AdcSpiCtrl_Hdl.CSn,
+      SPI_MOSI      => if_AdcSpiCtrl_Hdl.SDO,
+      SPI_MISO      => if_AdcSpiCtrl_Hdl.SDI,
+      SPI_SCLK      => if_AdcSpiCtrl_Hdl.SCLK,
+      tx_trn        => if_SpiHdlManager.tx_trn,
+      rx_trn        => if_SpiHdlManager.rx_trn,
+      addr          => if_SpiHdlManager.addr,
+      wr_data       => if_SpiHdlManager.wr_data,
+      rst           => if_SpiHdlManager.reset,
+      SPI_BUSY      => if_SpiHdlManager.busy,
+      SPI_READ_DONE => if_SpiHdlManager.read_done,
+      read_data     => if_SpiHdlManager.read_data
+      );
+
   bd_MicroblazeSpi : entity work.design_1_wrapper
     port map(
       bd_clk           => clk_MAIN,
       bd_reset         => mb_reset,
-      SPI_0_io0_io     => adc_spi_ctrl.SDO,
-      SPI_0_io1_io     => adc_spi_ctrl.SDI,
-      SPI_0_sck_io     => adc_spi_ctrl.SCLK,
-      SPI_0_ss_io      => adc_spi_ctrl.CSn,
+      SPI_0_io0_io     => if_AdcSpiCtrl_Microblaze.SDO,
+      SPI_0_io1_io     => if_AdcSpiCtrl_Microblaze.SDI,
+      SPI_0_sck_io     => if_AdcSpiCtrl_Microblaze.SCLK,
+      SPI_0_ss_io      => if_AdcSpiCtrl_Microblaze.CSn,
       gpio_rtl_0_tri_o => if_MbGpioRaw
       );
 
   if_MbGpio.PhaseShiftForwardButton  <= if_MbGpioRaw(0);
   if_MbGpio.PhaseShiftBackwardButton <= if_MbGpioRaw(1);
+
+  -- Mux SPI master
+  with ctrl_SelectSpiSource select
+    adc_spi_ctrl <= if_AdcSpiCtrl_Microblaze when '1',
+                    if_AdcSpiCtrl_Hdl when '0';
+
   -- </.>
 
   -- <Phase shift control for ADC DCLK>

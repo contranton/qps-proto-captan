@@ -65,6 +65,17 @@ package qps_pkg is
     SDO    : std_logic;
   end record t_ADC_CTRL;
 
+  type t_SPI_MGT is record
+    addr : std_logic_vector(7 downto 0);
+    wr_data : std_logic_vector(15 downto 0);
+    reset : std_logic;
+    busy : std_logic;
+    read_done : std_logic;
+    read_data : std_logic_vector(23 downto 0);
+    tx_trn : std_logic;
+    rx_trn : std_logic;
+  end record t_SPI_MGT;
+
   type t_ADC_RAW_DATA is array(natural range<>) of std_logic;
 
   type t_ADC_BUS is array(natural range <>) of t_ADC_WORD;
