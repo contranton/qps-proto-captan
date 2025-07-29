@@ -176,6 +176,15 @@ architecture rtl of main is
 
   signal eth_data : std_logic_vector(c_ADC_BITS-1 downto 0) := (others => '0');
 
+  -- AUtoalign signals
+  signal trigger              : std_logic;
+  signal n_delays             : signed(15 downto 0);
+  signal autoalign_done       : std_logic;
+  signal start                : std_logic;
+  signal autoalign_trigger    : std_logic;
+  signal autoalign_error      : std_logic;
+  signal error_out            : std_logic;
+
 begin
 
   dclk_cdc_buf : BUFG
