@@ -163,14 +163,28 @@ architecture rtl of main is
   signal sequencer_channel : std_logic_vector(c_LOG2_CHANNELS-1 downto 0);
 
   -- MB GPIO
-  signal mb_gpio_raw : std_logic_vector (31 downto 0);
+  signal mb_gpio_raw_output : std_logic_vector (31 downto 0);
+  signal mb_gpio_raw_input : std_logic_vector (31 downto 0);
+  signal mb_gpio_raw_tristate : std_logic_vector (31 downto 0);
+
+  type t_gpio_entry is record           -- GPIO record, holding data and tristate signals
+    data      : std_logic;
+    direction : std_logic;
+  end record t_gpio_entry;
+
+  -- type t_gpio_arr is array (positive range<>) of t_gpio_entry;
 
   type t_mb_gpio is record
-    phase_shift_forward_button  : std_logic;
-    phase_shift_backward_button : std_logic;
+    phase_shift_forward_button  : t_gpio_entry ;
+    phase_shift_backward_button : t_gpio_entry ;
+    adc_test_data_on            : t_gpio_entry ;
   end record t_mb_gpio;
 
-  signal mb_gpio : t_mb_gpio;
+  signal mb_gpio : t_mb_gpio := (
+    phase_shift_forward_button  => (data => '0', direction => '0'),
+    phase_shift_backward_button => (data => '0', direction => '0'),
+    adc_test_data_on            => (data => '0', direction => '1')
+    );
 
   signal timestamp : std_logic_vector(c_BITS_TIMESTAMP - 1 downto 0);
 
@@ -309,15 +323,22 @@ begin
       SPI_0_io1_io     => adc_spi_ctrl.SDI,
       SPI_0_sck_io     => adc_spi_ctrl.SCLK,
       SPI_0_ss_io      => adc_spi_ctrl.CSn,
-      gpio_rtl_0_tri_o => mb_gpio_raw
+      gpio_rtl_0_tri_o => mb_gpio_raw_output,
+      gpio_rtl_0_tri_i => mb_gpio_raw_input,
+      gpio_rtl_0_tri_t => mb_gpio_raw_tristate
       );
 
-  mb_gpio.phase_shift_forward_button  <= mb_gpio_raw(0);
-  mb_gpio.phase_shift_backward_button <= mb_gpio_raw(1);
+  mb_gpio.phase_shift_forward_button.data  <= mb_gpio_raw_output(0);
+  mb_gpio.phase_shift_backward_button.data <= mb_gpio_raw_output(1);
+  mb_gpio.adc_test_data_on.data            <= mb_gpio_raw_input(2);
+
+  mb_gpio_raw_tristate(0) <= mb_gpio.phase_shift_forward_button.direction;
+  mb_gpio_raw_tristate(1) <= mb_gpio.phase_shift_backward_button.direction;
+  mb_gpio_raw_tristate(2) <= mb_gpio.adc_test_data_on.direction;
 
 
-  phase_shift_backward_button <= phase_shift_backward_vio or mb_gpio.phase_shift_backward_button;
-  phase_shift_forward_button  <= phase_shift_forward_vio or mb_gpio.phase_shift_forward_button;
+  phase_shift_backward_button <= phase_shift_backward_vio or mb_gpio.phase_shift_backward_button.data;
+  phase_shift_forward_button  <= phase_shift_forward_vio or mb_gpio.phase_shift_forward_button.data;
   phase_shift_ctrl : entity work.phase_shift_ctrl
     port map(
       clk             => MASTER_CLK,
