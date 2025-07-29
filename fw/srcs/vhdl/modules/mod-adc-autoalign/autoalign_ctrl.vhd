@@ -17,7 +17,7 @@
 -- Author     :   <javierc@correlator6.fnal.gov>
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-07-28
--- Last update: 2025-07-28
+-- Last update: 2025-07-29
 -- Platform   :
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -28,26 +28,27 @@
 -------------------------------------------------------------------------------
 -- Revisions  :
 -- Date        Version  Author  Description
--- 2025-07-28  1.0      javierc	Created
+-- 2025-07-28  1.0      javierc   Created
 -------------------------------------------------------------------------------
+
+use work.autoalign_pkg.all;
+
 entity autoalign_ctrl is
 
   port (
-    clk : in std_logic;
-    reset : in std_logic;
-    start : in std_logic;
-    autoalign_trigger : out std_logic;
-    autoalign_done : in std_logic;
-    autoalign_error : in std_logic;
+    clk                : in  std_logic;
+    reset              : in  std_logic;
+    start              : in  std_logic;
+    autoalign_trigger  : out std_logic;
+    autoalign_done     : in  std_logic;
+    autoalign_error    : in  std_logic;
     gpio_set_test_data : out std_logic;
-    gpio_unset_test_data : out std_logic;
-    error_out : out std_logic
-
+    error_out          : out std_logic
+    );
 end entity autoalign_ctrl;
 
 architecture rtl of autoalign_ctrl is
 
-  type t_autoalign_status is (st_STANDBY, st_RUNNING, st_DONE, st_ERROR);
 
   signal status : t_autoalign_status := st_STANDBY;
 
@@ -57,7 +58,7 @@ begin  -- architecture rtl
   -- type   : sequential
   -- inputs : clk, reset
   -- outputs:
-  p_Run: process (clk) is
+  p_Run : process (clk) is
   begin  -- process p_Run
     if rising_edge(clk) then            -- rising clock edge
       if reset = '0' then               -- synchronous reset (active low)
@@ -66,22 +67,22 @@ begin  -- architecture rtl
         case status is
           when st_STANDBY =>
             if start then
-              status <= st_RUNNING;
-              autoalign_trigger <= '1';
+              status             <= st_RUNNING;
+              autoalign_trigger  <= '1';
               gpio_set_test_data <= '1';
             end if;
           when st_RUNNING =>
             if autoalign_done then
-              status <= st_DONE;
+              status             <= st_DONE;
               gpio_set_test_data <= '0';
-              gpio_unset_test_data <= '1';
+              gpio_set_test_data <= '0';
             end if;
             if autoalign_error then
               status <= st_ERROR;
             end if;
           when st_DONE =>
             if start then
-              status <= st_RUNNING;
+              status            <= st_RUNNING;
               autoalign_trigger <= '1';
             end if;
           when st_ERROR =>
@@ -91,5 +92,5 @@ begin  -- architecture rtl
       end if;
     end if;
   end process p_Run;
-  
+
 end architecture rtl;

@@ -17,7 +17,7 @@
 -- Author : Javier Contreras 52425N
 -- Division : CSAID/RTPS/DIS
 -- Created : 2025-07-11
--- Last update: 2025-07-28
+-- Last update: 2025-07-29
 -- Platform :
 -- Standard : VHDL'08
 -------------------------------------------------------------------------------
@@ -37,6 +37,8 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+
+use work.autoalign_pkg.all;
 
 entity adc_autoalign is
 
