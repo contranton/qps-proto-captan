@@ -57,6 +57,20 @@ package qps_pkg is
     ch8 : t_ADC_WORD;
   end record t_DESERIALIZER_OUTPUT;
 
+  -- High-level controller interface
+  type t_AUTOALIGN_CTRL_IF is record
+    autoalign_done    : std_logic;
+    autoalign_trigger : std_logic;
+    autoalign_error   : std_logic;
+  end record t_AUTOALIGN_CTRL_IF;
+
+  type t_AUTOALIGN_IF is record
+    trigger           : std_logic;
+    n_delays          : signed(15 downto 0);
+    start             : std_logic;
+    error_out         : std_logic;
+  end record t_AUTOALIGN_IF;
+
   type t_ADC_CTRL is record
     SPI_EN : std_logic;
     CSn    : std_logic_vector(0 downto 0);

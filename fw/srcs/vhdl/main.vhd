@@ -116,6 +116,9 @@ architecture rtl of main is
   signal if_MbGpio    : t_MB_GPIO;
   -- </.>
 
+  -- <ADC autoaligner>
+  signal if_AutoalignControl : t_AUTOALIGN_CTRL_IF;
+  signal if_Autoalign        : t_AUTOALIGN_IF;
 
 --  __  __       _             _       _           __ _
 -- |  \/  | __ _(_)_ __     __| | __ _| |_ __ _   / _| | _____      __
@@ -226,17 +229,6 @@ architecture rtl of main is
   signal ctrl_TestDataEnable : std_logic                               := '0';
   signal sig_TestData        : std_logic_vector(c_ADC_BITS-1 downto 0) := (others => '0');
 
-
-
-  -- AUtoalign signals
-  signal trigger              : std_logic;
-  signal n_delays             : signed(15 downto 0);
-  signal autoalign_done       : std_logic;
-  signal start                : std_logic;
-  signal autoalign_trigger    : std_logic;
-  signal autoalign_error      : std_logic;
-  signal error_out            : std_logic;
-
 begin
 
   -- Assignments
@@ -330,20 +322,20 @@ begin
       );
   -- </.>
 
-  -- TODO: make the signals
-  autoalign_ctrl_1: entity work.autoalign_ctrl
+  -- <ADC Autoaligners>
+  mod_AutoalignControl: entity work.autoalign_ctrl
     port map (
       clk                  => clk,
       reset                => reset,
       start                => start,
-      autoalign_trigger    => autoalign_trigger,
-      autoalign_done       => autoalign_done,
-      autoalign_error      => autoalign_error,
+      autoalign_trigger    => if_AutoalignControl.autoalign_trigger,
+      autoalign_done       => if_AutoalignControl.autoalign_done,
+      autoalign_error      => if_AutoalignControl.autoalign_error,
       gpio_set_test_data   => gpio_set_test_data,
       gpio_unset_test_data => gpio_unset_test_data,
       error_out            => error_out);
 
-  adc_autoalign_1: entity work.adc_autoalign
+  mod_Autoalign: entity work.adc_autoalign
     generic map (
       c_TEST_PATTERN => c_TEST_PATTERN)
     port map (
@@ -357,8 +349,9 @@ begin
       phase_shift_button_forward  => phase_shift_button_forward,
       phase_shift_button_backward => phase_shift_button_backward,
       phase_shift_done            => phase_shift_done);
+  -- </.>
 
-
+  -- <ADC DDR Deserializer>
   mod_TiDeserializer : entity work.deser_cmos
     port map(
       CMOS_DIN_A        => adc_data(0),
