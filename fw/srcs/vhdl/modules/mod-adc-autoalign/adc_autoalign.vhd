@@ -10,16 +10,15 @@
 --     /   /     \   \
 --     ----       ----
 -------------------------------------------------------------------------------
--- Title : ADC Autoalign
--- Project : QPS (Quench Prediction System) Prototype for APS-TD
+-- Title      : ADC Autoalign
+-- Project    : QPS (Quench Prediction System) Prototype for APS-TD
 -------------------------------------------------------------------------------
--- File : adc_autoalign.vhd
--- Author : Javier Contreras 52425N
--- Division : CSAID/RTPS/DIS
--- Created : 2025-07-11
--- Last update: 2025-07-28
--- Platform :
--- Standard : VHDL'08
+-- File       : adc_autoalign.vhd
+-- Author     : Javier Contreras 52425N
+-- Division   : CSAID/RTPS/DIS
+-- Created    : 2025-07-11
+-- Last update: 2025-07-29
+-- Standard   : VHDL'08
 -------------------------------------------------------------------------------
 -- Description: Shifts data_clk until test pattern reads correctly. This routine
 -- shifts the data_clock using clocking wizard's phase shift interface. It

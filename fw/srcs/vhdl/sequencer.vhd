@@ -1,23 +1,36 @@
 -------------------------------------------------------------------------------
--- Title : Sequencer for parallel-serial muxing
--- Project :
+--
+--        _-    -_
+--       |  |  |  |            Fermi National Accelerator Laboratory
+--       |  |  |  |
+--       |  |  |  |        Operated by Fermi Forward Discovery Group, LLC
+--       |  |  |  |        for the Department of Energy under contract
+--       /  |  |   \                    89243024CSC000002
+--      /   /   \   \
+--     /   /     \   \
+--     ----       ----
 -------------------------------------------------------------------------------
--- File : sequencer.vhd
--- Author : <javierc@correlator6.fnal.gov>
--- Company :
--- Created : 2025-05-23
--- Last update: 2025-07-23
--- Platform :
--- Standard : VHDL'08
+-- Title      : Sequencer for parallel-serial muxing by word size
+-- Project    : QPS (Quench Prediction System) Prototype for APS-TD
 -------------------------------------------------------------------------------
--- Description:
+-- File       : sequencer.vhd
+-- Author     :   <javierc@correlator6.fnal.gov>
+-- Division   : CSAID/RTPS/DIS
+-- Created    : 2025-05-23
+-- Last update: 2025-07-29
+-- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
--- Copyright (c) 2025
+-- Description: Takes a parallel array of adc words and outputs them one by one
+-- along their associated channel
+-- TODO: Add channel mapping here?
 -------------------------------------------------------------------------------
--- Revisions :
--- Date Version Author Description
--- 2025-05-23 1.0 javierc Created
+-- Copyright (c) 2025 Fermi Forward Discovery Group, LLC
 -------------------------------------------------------------------------------
+-- Revisions  :
+-- Date        Version  Author  Description
+-- 2025-07-29  1.0      javierc	Created
+-------------------------------------------------------------------------------
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
