@@ -6,7 +6,7 @@
 -- Author : <javierc@correlator6.fnal.gov>
 -- Company :
 -- Created : 2025-05-22
--- Last update: 2025-07-23
+-- Last update: 2025-07-29
 -- Platform :
 -- Standard : VHDL'08
 -------------------------------------------------------------------------------
@@ -339,6 +339,35 @@ begin
       reset         => clk_wiz_phase_shift_reset,
       locked        => clk_wiz_phase_shift_locked
       );
+
+  -- TODO: make the signals
+  autoalign_ctrl_1: entity work.autoalign_ctrl
+    port map (
+      clk                  => clk,
+      reset                => reset,
+      start                => start,
+      autoalign_trigger    => autoalign_trigger,
+      autoalign_done       => autoalign_done,
+      autoalign_error      => autoalign_error,
+      gpio_set_test_data   => gpio_set_test_data,
+      gpio_unset_test_data => gpio_unset_test_data,
+      error_out            => error_out);
+
+  adc_autoalign_1: entity work.adc_autoalign
+    generic map (
+      c_TEST_PATTERN => c_TEST_PATTERN)
+    port map (
+      clk                         => clk,
+      reset                       => reset,
+      deserializer_raw_data       => deserializer_raw_data,
+      deserializer_raw_data_valid => deserializer_raw_data_valid,
+      trigger                     => trigger,
+      n_delays                    => n_delays,
+      autoalign_done              => autoalign_done,
+      phase_shift_button_forward  => phase_shift_button_forward,
+      phase_shift_button_backward => phase_shift_button_backward,
+      phase_shift_done            => phase_shift_done);
+
 
   ti_deserializer : entity work.deser_cmos
     port map(
