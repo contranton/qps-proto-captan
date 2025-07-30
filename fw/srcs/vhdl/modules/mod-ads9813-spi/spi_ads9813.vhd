@@ -71,7 +71,6 @@ begin  -- architecture rtl
           null;
         when st_TX =>
           fsm_CommunicationState <= st_WAIT;
-          null;
         when st_WAIT =>
           null;
         when st_RX =>
