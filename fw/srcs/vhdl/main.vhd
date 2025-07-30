@@ -45,7 +45,8 @@ use xpm.vcomponents.all;
 
 entity main is
   generic (
-    constant c_DEBUG_ENABLE : std_logic := '1'
+    constant c_DEBUG_ENABLE       : std_logic := '1';
+    constant c_USE_MICROBLAZE_SPI : std_logic := '0'
     );
   port (
     USER_CLK1 : in  std_logic;
@@ -302,7 +303,28 @@ begin
   -- </.> --
 
   -- <SPI module for ADC configuration>
-  mod_Ads9813Aspi : entity work.SpiController_ADS9813
+  gen_Spi : if c_USE_MICROBLAZE_SPI = '0' generate
+    adc_spi_ctrl <= if_AdcSpiCtrl_Hdl;
+
+    mod_HdlSpi : entity work.spi_master
+      port map(
+        spi_clk       => clk_MAIN,
+        SPI_EN        => if_AdcSpiCtrl_Hdl.SPI_EN,
+        SPI_CS_Z      => if_AdcSpiCtrl_Hdl.CSn,
+        SPI_MOSI      => if_AdcSpiCtrl_Hdl.SDO,
+        SPI_MISO      => if_AdcSpiCtrl_Hdl.SDI,
+        SPI_SCLK      => if_AdcSpiCtrl_Hdl.SCLK,
+        tx_trn        => if_SpiHdlManager.tx_trn,
+        rx_trn        => if_SpiHdlManager.rx_trn,
+        addr          => if_SpiHdlManager.addr,
+        wr_data       => if_SpiHdlManager.wr_data,
+        rst           => if_SpiHdlManager.reset,
+        SPI_BUSY      => if_SpiHdlManager.busy,
+        SPI_READ_DONE => if_SpiHdlManager.read_done,
+        read_data     => if_SpiHdlManager.read_data
+        );
+
+    mod_Ads9813Aspi : entity work.SpiController_ADS9813
       port map (
         clk              => clk_MAIN,
         FunctionAddress  => sig_AdcFunctionAddress,
@@ -311,47 +333,25 @@ begin
         readData         => sig_AdcReadData,
         if_AdcUserConfig => if_AdcUserConfig,
         if_Spi           => if_SpiHdlManager);
-  -- </.>
 
-  -- <Microblaze Block Design for SPI + GPIO>
+  else generate
+    adc_spi_ctrl <= if_AdcSpiCtrl_Microblaze;
 
-  mod_HdlSpi : entity work.spi_master
-    port map(
-      spi_clk       => clk_MAIN,
-      SPI_EN        => if_AdcSpiCtrl_Hdl.SPI_EN,
-      SPI_CS_Z      => if_AdcSpiCtrl_Hdl.CSn,
-      SPI_MOSI      => if_AdcSpiCtrl_Hdl.SDO,
-      SPI_MISO      => if_AdcSpiCtrl_Hdl.SDI,
-      SPI_SCLK      => if_AdcSpiCtrl_Hdl.SCLK,
-      tx_trn        => if_SpiHdlManager.tx_trn,
-      rx_trn        => if_SpiHdlManager.rx_trn,
-      addr          => if_SpiHdlManager.addr,
-      wr_data       => if_SpiHdlManager.wr_data,
-      rst           => if_SpiHdlManager.reset,
-      SPI_BUSY      => if_SpiHdlManager.busy,
-      SPI_READ_DONE => if_SpiHdlManager.read_done,
-      read_data     => if_SpiHdlManager.read_data
-      );
+    bd_MicroblazeSpi : entity work.design_1_wrapper
+      port map(
+        bd_clk           => clk_MAIN,
+        bd_reset         => mb_reset,
+        SPI_0_io0_io     => if_AdcSpiCtrl_Microblaze.SDO,
+        SPI_0_io1_io     => if_AdcSpiCtrl_Microblaze.SDI,
+        SPI_0_sck_io     => if_AdcSpiCtrl_Microblaze.SCLK,
+        SPI_0_ss_io      => if_AdcSpiCtrl_Microblaze.CSn,
+        gpio_rtl_0_tri_o => if_MbGpioRaw
+        );
 
-  bd_MicroblazeSpi : entity work.design_1_wrapper
-    port map(
-      bd_clk           => clk_MAIN,
-      bd_reset         => mb_reset,
-      SPI_0_io0_io     => if_AdcSpiCtrl_Microblaze.SDO,
-      SPI_0_io1_io     => if_AdcSpiCtrl_Microblaze.SDI,
-      SPI_0_sck_io     => if_AdcSpiCtrl_Microblaze.SCLK,
-      SPI_0_ss_io      => if_AdcSpiCtrl_Microblaze.CSn,
-      gpio_rtl_0_tri_o => if_MbGpioRaw
-      );
+    if_MbGpio.PhaseShiftForwardButton  <= if_MbGpioRaw(0);
+    if_MbGpio.PhaseShiftBackwardButton <= if_MbGpioRaw(1);
 
-  if_MbGpio.PhaseShiftForwardButton  <= if_MbGpioRaw(0);
-  if_MbGpio.PhaseShiftBackwardButton <= if_MbGpioRaw(1);
-
-  -- Mux SPI master
-  with ctrl_SelectSpiSource select
-    adc_spi_ctrl <= if_AdcSpiCtrl_Microblaze when '1',
-                    if_AdcSpiCtrl_Hdl when '0';
-
+  end generate gen_Spi;
   -- </.>
 
   -- <Phase shift control for ADC DCLK>
