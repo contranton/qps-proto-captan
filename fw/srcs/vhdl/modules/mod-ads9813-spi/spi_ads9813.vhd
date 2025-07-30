@@ -63,7 +63,7 @@ architecture rtl of SpiController_ADS9813 is
 
 begin  -- architecture rtl
 
-  p_fsm_Comunication: process(clk) is
+  p_fsm_Communication: process(clk) is
   begin
     if rising_edge(clk) then
       case fsm_CommunicationState is
@@ -80,12 +80,12 @@ begin  -- architecture rtl
           null;
       end case;
     end if;
-  end process p_fsm_Comunication;
+  end process p_fsm_Communication;
 
   p_CommunicationWait : process (clk) is
     begin
       if rising_edge(clk) then
-        if not if_Spi.busy
+        -- if not if_Spi.busy
       end if;
     end process p_CommunicationWait;
 
@@ -98,6 +98,10 @@ begin  -- architecture rtl
           when en_FUNCTION_NONE =>
             null;
           when en_FUNCTION_INIT =>
+            sig_TxBuffer(0) <= c_data_SpiCommands(cmd_INIT_1);
+            sig_TxBuffer(1) <= c_data_SpiCommands(cmd_SEL_B2);
+            sig_TxBuffer(2) <= c_data_SpiCommands(cmd_B2_INIT_2);
+            sig_TxBuffer(3) <= c_data_SpiCommands(cmd_B2_INIT_3);
             null;
           when en_FUNCTION_SET_TEST =>
             null;
