@@ -58,7 +58,7 @@ architecture rtl of SpiController_ADS9813 is
   -- </.>
 
   -- <Transmission FIFO>
-  signal sig_TxBuffer  : t_arr_SPI_TX_BUFFER(0 to 9);
+  signal sig_TxBuffer  : t_arr_SPI_TX_BUFFER;
   signal sig_TxPointer : t_POINTER;
   -- </.>
 
@@ -172,7 +172,8 @@ begin  -- architecture rtl
                               x"2222" when en_VOLTSCALE_2V5,
                               x"3333" when en_VOLTSCALE_7V0,
                               x"4444" when en_VOLTSCALE_10V0,
-                              x"5555" when en_VOLTSCALE_12V0;
+                              x"5555" when en_VOLTSCALE_12V0,
+                               (others => 'X') when others;
             proc_BufferPush(buf, ptr, v_Cmd);
 
             -- Repeat for channels 5-8
@@ -189,7 +190,7 @@ begin  -- architecture rtl
             proc_BufferPush(buf, ptr, v_Cmd);
 
             v_Cmd := spi(cmd_B1_TEST_PATTERN_SET_3OF4);
-            v_Cmd.data := if_AdcUserConfig.TestPatternCh5To8(23 downto 16);
+            v_Cmd.data := if_AdcUserConfig.TestPatternCh5To8(15 downto 0);
             proc_BufferPush(buf, ptr, v_Cmd);
 
             v_Cmd := spi(cmd_B1_TEST_PATTERN_SET_4OF4);

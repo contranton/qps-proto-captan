@@ -14,7 +14,7 @@
 -- Project    : QPS (Quench Prediction System) Prototype for APS-TD
 -------------------------------------------------------------------------------
 -- File       : main.vhd
--- Author     :   <javierc@correlator6.fnal.gov>
+-- Author     : Javier Contreras 52425N
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-05-22
 -- Last update: 2025-07-30
