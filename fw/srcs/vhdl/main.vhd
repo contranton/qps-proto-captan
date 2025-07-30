@@ -17,7 +17,7 @@
 -- Author     :   <javierc@correlator6.fnal.gov>
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-05-22
--- Last update: 2025-07-29
+-- Last update: 2025-07-30
 -- Standard   : VHDL'08
 -------------------------------------------------------------------------------
 -- Description: Configures ADS9813 ADC and transmits incoming data (+ timestamp)
@@ -31,6 +31,7 @@
 -------------------------------------------------------------------------------
 
 use work.qps_pkg.all;
+use work.ads9813_pkg.all;
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -121,6 +122,22 @@ architecture rtl of main is
   signal if_AdcSpiCtrl_Microblaze : t_ADC_CTRL;
   signal if_AdcSpiCtrl_Hdl        : t_ADC_CTRL;
   signal if_SpiHdlManager         : t_SPI_MGT;
+  -- </.>
+
+
+  -- <ADC configuration>
+  signal sig_AdcFunctionAddress : t_enum_ADS9813_SPI_FUNCTIONS;
+  signal sig_AdcSpiTriggerTx    : std_logic;
+  signal sig_AdcSpiTriggerRx    : std_logic := '0';
+  signal sig_AdcReadData        : std_logic_vector(23 downto 0);
+
+  signal if_AdcUserConfig : t_ADC_USER_CONFIG :=
+    (
+      VoltageScale      => en_VOLTSCALE_5V0,
+      TestPatternCh1To4 => c_INITIAL_TEST_PATTERN_CH1_4,
+      TestPatternCh5To8 => c_INITIAL_TEST_PATTERN_CH5_8
+      );
+  -- </.>
 
 --  __  __       _             _       _           __ _
 -- |  \/  | __ _(_)_ __     __| | __ _| |_ __ _   / _| | _____      __
@@ -283,6 +300,18 @@ begin
                       adc_sample_clk_4mhz when '0',
                       '0'                 when others;
   -- </.> --
+
+  -- <SPI module for ADC configuration>
+  mod_Ads9813Aspi : entity work.SpiController_ADS9813
+      port map (
+        clk              => clk_MAIN,
+        FunctionAddress  => sig_AdcFunctionAddress,
+        triggerTx        => sig_AdcSpiTriggerTx,
+        triggerRx        => sig_AdcSpiTriggerRx,
+        readData         => sig_AdcReadData,
+        if_AdcUserConfig => if_AdcUserConfig,
+        if_Spi           => if_SpiHdlManager);
+  -- </.>
 
   -- <Microblaze Block Design for SPI + GPIO>
 

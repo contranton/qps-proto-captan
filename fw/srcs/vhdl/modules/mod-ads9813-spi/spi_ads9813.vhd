@@ -52,7 +52,7 @@ end entity SpiController_ADS9813;
 architecture rtl of SpiController_ADS9813 is
 
   -- <State Machine>
-  type t_fsm_CommunicationState is (st_IDLE, st_TX, st_WAIT, st_RX);
+  type t_fsm_CommunicationState is (st_IDLE, st_TX, st_RX);
   signal fsm_CommunicationState : t_fsm_CommunicationState;
   signal sig_TxDone             : std_logic := '0';
   -- </.>
