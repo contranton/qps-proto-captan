@@ -181,7 +181,9 @@ architecture rtl of main is
 
   -- Data timestamp. At 150MHz clk_MAIN, 1 LSB = 6.66ns
   -- With c_BITS_TIMESTAMP = 37, this amounts to 916s \approx 15 min.
-  signal sig_Timestamp  : std_logic_vector(c_BITS_TIMESTAMP - 1 downto 0);
+  signal sig_Timestamp       : std_logic_vector(c_BITS_TIMESTAMP - 1 downto 0);
+  signal sig_TimestampFrozen : std_logic_vector(c_BITS_TIMESTAMP - 1 downto 0);
+
   -- Mux signals to ethernet
   signal sig_PacketData : std_logic_vector(c_ADC_BITS-1 downto 0) := (others => '0');
 
@@ -465,6 +467,22 @@ begin
   end process p_GenTestData;
   -- </.>
 
+
+  -- <Timestamp generator>
+  mod_Timestamp : entity work.timestamp_generator
+    generic map(
+      c_BITS_TIMESTAMP => c_BITS_TIMESTAMP
+      )
+    port map(
+      clk              => clk_MAIN,
+      reset            => reset,
+      enable           => ctrl_TimestampEnable,
+      freeze           => sig_axis_AdcData_MasterClk_tvalid,
+      timestamp        => sig_Timestamp,
+      timestamp_frozen => sig_TimestampFrozen
+      );
+  -- </.>
+
   -- <Mux data to send and add timestamp>
   p_Packetize : process (all) is
   begin
@@ -473,7 +491,8 @@ begin
     else
       sig_PacketData <= sig_SequencerOut;  -- serialized adc data
     end if;
-    sig_axis_PacketizedData_MasterClk_tdata  <= sig_Timestamp & sig_SequencerChannel & sig_PacketData;
+    sig_axis_PacketizedData_MasterClk_tdata <=
+      sig_TimestampFrozen & sig_SequencerChannel & sig_PacketData;
     sig_axis_PacketizedData_MasterClk_tvalid <= sig_SequencerValid;
   end process p_Packetize;
   -- </.>
