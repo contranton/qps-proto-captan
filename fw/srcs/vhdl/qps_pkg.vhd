@@ -17,7 +17,7 @@
 -- Author     :   <javierc@correlator6.fnal.gov>
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-05-22
--- Last update: 2025-07-29
+-- Last update: 2025-07-31
 -- Standard   : VHDL'08
 -------------------------------------------------------------------------------
 -- Description: This package defines types for a simple DAQ system based on
@@ -79,6 +79,17 @@ package qps_pkg is
     SDO    : std_logic;
   end record t_ADC_CTRL;
 
+  type t_SPI_MGT is record
+    addr : std_logic_vector(7 downto 0);
+    wr_data : std_logic_vector(15 downto 0);
+    reset : std_logic;
+    busy : std_logic;
+    read_done : std_logic;
+    read_data : std_logic_vector(23 downto 0);
+    tx_trn : std_logic;
+    rx_trn : std_logic;
+  end record t_SPI_MGT;
+
   type t_ADC_RAW_DATA is array(natural range<>) of std_logic;
 
   type t_ADC_BUS is array(natural range <>) of t_ADC_WORD;
@@ -127,6 +138,8 @@ package qps_pkg is
     PHY_TXER       : std_logic;
   end record t_GEL_PHY_TX;
 
+  function f_Channelize(arg_DataIn  : std_logic_vector(c_MSB-1 downto 0)) return t_ADC_BUS;
+
   --function fix_deserializer_bits( x : std_logic_vector(23 downto 0) )
     --return std_logic_vector(23 downto 0);
 
@@ -145,6 +158,20 @@ begin
     end loop;
     return result;
   end function;
+
+  function f_Channelize(
+    arg_DataIn : std_logic_vector(c_MSB-1 downto 0)
+    ) return t_ADC_BUS is
+    variable v_Output : t_ADC_BUS(0 to c_NUM_ADC_CHANNELS-1);
+    variable v_Msb, v_Lsb : natural;
+  begin
+    for i in 0 to c_NUM_ADC_CHANNELS - 1 loop
+      v_Msb := c_ADC_BITS*(c_NUM_ADC_CHANNELS - i);
+      v_Lsb := c_ADC_BITS*(c_NUM_ADC_CHANNELS - i - 1);
+      v_Output(i) := arg_DataIn(v_Msb - 1 downto v_Lsb);
+    end loop;
+    return v_Output;
+  end function f_Channelize;
 
   --function fix_deserializer_bits(
     --x : std_logic_vector(23 downto 0)

@@ -14,10 +14,10 @@
 -- Project    : QPS (Quench Prediction System) Prototype for APS-TD
 -------------------------------------------------------------------------------
 -- File       : main.vhd
--- Author     :   <javierc@correlator6.fnal.gov>
+-- Author     : Javier Contreras 52425N
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-05-22
--- Last update: 2025-07-29
+-- Last update: 2025-07-31
 -- Standard   : VHDL'08
 -------------------------------------------------------------------------------
 -- Description: Configures ADS9813 ADC and transmits incoming data (+ timestamp)
@@ -31,6 +31,8 @@
 -------------------------------------------------------------------------------
 
 use work.qps_pkg.all;
+use work.ads9813_pkg.all;
+use work.register_space_pkg.all;
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -44,7 +46,8 @@ use xpm.vcomponents.all;
 
 entity main is
   generic (
-    constant c_DEBUG_ENABLE : std_logic := '1'
+    constant c_DEBUG_ENABLE       : std_logic := '1';
+    constant c_USE_MICROBLAZE_SPI : std_logic := '0'
     );
   port (
     USER_CLK1 : in  std_logic;
@@ -120,6 +123,30 @@ architecture rtl of main is
   signal if_AutoalignControl : t_AUTOALIGN_CTRL_IF;
   signal if_Autoalign        : t_AUTOALIGN_IF;
 
+  -- <SPI interfaces>
+  signal if_AdcSpiCtrl_Microblaze : t_ADC_CTRL;
+  signal if_AdcSpiCtrl_Hdl        : t_ADC_CTRL;
+  signal if_SpiHdlManager         : t_SPI_MGT;
+  -- </.>
+
+
+  -- <ADC configuration>
+  signal sig_AdcFunctionAddress : t_enum_ADS9813_SPI_FUNCTIONS;
+  signal sig_AdcSpiTriggerTx    : std_logic;
+  signal sig_AdcSpiTriggerRx    : std_logic := '0';
+  signal sig_AdcReadData        : std_logic_vector(23 downto 0);
+
+  signal if_AdcUserConfig : t_ADC_USER_CONFIG :=
+    (
+      VoltageScale      => en_VOLTSCALE_5V0,
+      TestPatternCh1To4 => c_INITIAL_TEST_PATTERN_CH1_4,
+      TestPatternCh5To8 => c_INITIAL_TEST_PATTERN_CH5_8
+      );
+
+  -- <Register space interface>
+  signal if_RegSpace : t_CONFIG_REGISTER_INTERFACE;
+  -- </.>
+
 --  __  __       _             _       _           __ _
 -- |  \/  | __ _(_)_ __     __| | __ _| |_ __ _   / _| | _____      __
 -- | |\/| |/ _` | | '_ \   / _` |/ _` | __/ _` | | |_| |/ _ \ \ /\ / /
@@ -142,10 +169,6 @@ architecture rtl of main is
   signal sig_axis_AdcData_MasterClk_tdata  : std_logic_vector(c_MSB-1 downto 0);
   -- </.>
 
-  -- Sequencer data Input
-  -- Splits large std_logic_vector into per_channel ADC words
-  signal sig_AdcDataPerChannel : t_ADC_BUS(0 to c_NUM_ADC_CHANNELS-1);
-
   -- <Raw Sequencer Output>
   signal sig_SequencerOut     : std_logic_vector(c_ADC_BITS-1 downto 0) := (others => '0');
   signal sig_SequencerValid   : std_logic                               := '0';
@@ -161,7 +184,9 @@ architecture rtl of main is
 
   -- Data timestamp. At 150MHz clk_MAIN, 1 LSB = 6.66ns
   -- With c_BITS_TIMESTAMP = 37, this amounts to 916s \approx 15 min.
-  signal sig_Timestamp  : std_logic_vector(c_BITS_TIMESTAMP - 1 downto 0);
+  signal sig_Timestamp       : std_logic_vector(c_BITS_TIMESTAMP - 1 downto 0);
+  signal sig_TimestampFrozen : std_logic_vector(c_BITS_TIMESTAMP - 1 downto 0);
+
   -- Mux signals to ethernet
   signal sig_PacketData : std_logic_vector(c_ADC_BITS-1 downto 0) := (others => '0');
 
@@ -193,6 +218,8 @@ architecture rtl of main is
   -- Selector for sample clock mux (4MHz/8MHz)
   signal ctrl_SampleRateSelect : std_logic := '0';
 
+  -- Enables timestamp counter
+  signal ctrl_TimestampEnable : std_logic := '1';
 
 --  ____       _
 -- |  _ \  ___| |__  _   _  __ _
@@ -223,6 +250,11 @@ architecture rtl of main is
   signal vio_out_PhyResetSig              : std_logic := '1';
   signal vio_out_PhyResetSig_sync         : std_logic := '1';
   signal vio_out_EthDataGenEnable         : std_logic := '0';
+
+  -- Sequencer data Input
+  -- Splits large std_logic_vector into per_channel ADC words
+  signal sig_AdcDataPerChannel : t_ADC_BUS(0 to c_NUM_ADC_CHANNELS-1);
+
 
   -- Test data generator for ethernet interface
   -- Most useful when ADC wasn't yet working. Now deprecated.
@@ -280,20 +312,56 @@ begin
                       '0'                 when others;
   -- </.> --
 
-  -- <Microblaze Block Design for SPI + GPIO>
-  bd_MicroblazeSpi : entity work.design_1_wrapper
-    port map(
-      bd_clk           => clk_MAIN,
-      bd_reset         => mb_reset,
-      SPI_0_io0_io     => adc_spi_ctrl.SDO,
-      SPI_0_io1_io     => adc_spi_ctrl.SDI,
-      SPI_0_sck_io     => adc_spi_ctrl.SCLK,
-      SPI_0_ss_io      => adc_spi_ctrl.CSn,
-      gpio_rtl_0_tri_o => if_MbGpioRaw
-      );
+  -- <SPI module for ADC configuration>
+  gen_Spi : if c_USE_MICROBLAZE_SPI = '0' generate
+    adc_spi_ctrl <= if_AdcSpiCtrl_Hdl;
 
-  if_MbGpio.PhaseShiftForwardButton  <= if_MbGpioRaw(0);
-  if_MbGpio.PhaseShiftBackwardButton <= if_MbGpioRaw(1);
+    mod_HdlSpi : entity work.spi_master
+      port map(
+        spi_clk       => clk_MAIN,
+        SPI_EN        => if_AdcSpiCtrl_Hdl.SPI_EN,
+        SPI_CS_Z      => if_AdcSpiCtrl_Hdl.CSn,
+        SPI_MOSI      => if_AdcSpiCtrl_Hdl.SDO,
+        SPI_MISO      => if_AdcSpiCtrl_Hdl.SDI,
+        SPI_SCLK      => if_AdcSpiCtrl_Hdl.SCLK,
+        tx_trn        => if_SpiHdlManager.tx_trn,
+        rx_trn        => if_SpiHdlManager.rx_trn,
+        addr          => if_SpiHdlManager.addr,
+        wr_data       => if_SpiHdlManager.wr_data,
+        rst           => if_SpiHdlManager.reset,
+        SPI_BUSY      => if_SpiHdlManager.busy,
+        SPI_READ_DONE => if_SpiHdlManager.read_done,
+        read_data     => if_SpiHdlManager.read_data
+        );
+
+    mod_Ads9813Aspi : entity work.SpiController_ADS9813
+      port map (
+        clk              => clk_MAIN,
+        FunctionAddress  => sig_AdcFunctionAddress,
+        triggerTx        => sig_AdcSpiTriggerTx,
+        triggerRx        => sig_AdcSpiTriggerRx,
+        readData         => sig_AdcReadData,
+        if_AdcUserConfig => if_AdcUserConfig,
+        if_Spi           => if_SpiHdlManager);
+
+  else generate
+    adc_spi_ctrl <= if_AdcSpiCtrl_Microblaze;
+
+    bd_MicroblazeSpi : entity work.design_1_wrapper
+      port map(
+        bd_clk           => clk_MAIN,
+        bd_reset         => mb_reset,
+        SPI_0_io0_io     => if_AdcSpiCtrl_Microblaze.SDO,
+        SPI_0_io1_io     => if_AdcSpiCtrl_Microblaze.SDI,
+        SPI_0_sck_io     => if_AdcSpiCtrl_Microblaze.SCLK,
+        SPI_0_ss_io      => if_AdcSpiCtrl_Microblaze.CSn,
+        gpio_rtl_0_tri_o => if_MbGpioRaw
+        );
+
+    if_MbGpio.PhaseShiftForwardButton  <= if_MbGpioRaw(0);
+    if_MbGpio.PhaseShiftBackwardButton <= if_MbGpioRaw(1);
+
+  end generate gen_Spi;
   -- </.>
 
   -- <Phase shift control for ADC DCLK>
@@ -391,14 +459,6 @@ begin
       m_axis_tdata   => sig_axis_AdcData_MasterClk_tdata);
   -- </.>
 
-  -- <Reserialize deserialized data per ADC channel>
-  gen_ChannelizeAdcData : for ii in 0 to c_NUM_ADC_CHANNELS - 1 generate
-    constant msb : natural := c_ADC_BITS*(c_NUM_ADC_CHANNELS - ii);
-    constant lsb : natural := c_ADC_BITS*(c_NUM_ADC_CHANNELS - ii - 1);
-  begin
-    sig_AdcDataPerChannel(ii) <= sig_axis_AdcData_MasterClk_tdata(msb - 1 downto lsb);
-  end generate gen_ChannelizeAdcData;
-  -- </.>
 
   -- <Assign channel to ADC data>
   mod_Sequencer : entity work.sequencer
@@ -407,24 +467,14 @@ begin
       )
     port map (
       clk               => clk_MAIN,
-      valid_in          => sig_axis_AdcData_MasterClk_tvalid,
       ready_in          => sig_axis_PacketizedData_MasterClk_tready,
-      input_bus         => sig_AdcDataPerChannel,
+      valid_in          => sig_axis_AdcData_MasterClk_tvalid,
+      input_bus         => f_Channelize(sig_axis_AdcData_MasterClk_tdata),
       valid_out         => sig_SequencerValid,
       output_data       => sig_SequencerOut,
       sequencer_channel => sig_SequencerChannel
       );
   -- </.>
-
-  -- <Generate timestamp and test data for ethernet>
-  p_GenerateTimestamp : process(clk_MAIN) is
-    variable counter : natural := 0;
-  begin
-    if rising_edge(clk_MAIN) then
-      counter       := counter + 1;
-      sig_Timestamp <= std_logic_vector(to_unsigned(counter, c_BITS_TIMESTAMP));
-    end if;
-  end process p_GenerateTimestamp;
 
   p_GenTestData : process(clk_MAIN) is
   begin
@@ -436,6 +486,22 @@ begin
   end process p_GenTestData;
   -- </.>
 
+
+  -- <Timestamp generator>
+  mod_Timestamp : entity work.timestamp_generator
+    generic map(
+      c_BITS_TIMESTAMP => c_BITS_TIMESTAMP
+      )
+    port map(
+      clk              => clk_MAIN,
+      reset            => reset,
+      enable           => ctrl_TimestampEnable,
+      freeze           => sig_axis_AdcData_MasterClk_tvalid,
+      timestamp        => sig_Timestamp,
+      timestamp_frozen => sig_TimestampFrozen
+      );
+  -- </.>
+
   -- <Mux data to send and add timestamp>
   p_Packetize : process (all) is
   begin
@@ -444,7 +510,8 @@ begin
     else
       sig_PacketData <= sig_SequencerOut;  -- serialized adc data
     end if;
-    sig_axis_PacketizedData_MasterClk_tdata  <= sig_Timestamp & sig_SequencerChannel & sig_PacketData;
+    sig_axis_PacketizedData_MasterClk_tdata <=
+      sig_TimestampFrozen & sig_SequencerChannel & sig_PacketData;
     sig_axis_PacketizedData_MasterClk_tvalid <= sig_SequencerValid;
   end process p_Packetize;
   -- </.>
@@ -483,6 +550,19 @@ begin
       PHY_TXD    => phy_tx.PHY_TXD,
       PHY_TX_EN  => phy_tx.PHY_TXCTL_TXEN,
       PHY_TX_ER  => phy_tx.PHY_TXER);
+
+  mod_RegisterSpace : entity work.register_space
+    port map(
+      clk => clk_PHY,
+      if_RegSpace => if_RegSpace);
+
+  -- TODO: The incoming ots address is 32 bits. SHould I extract only the sub-address I need?
+  -- I.e. how to reconstrain the input data without overflowing?
+  if_RegSpace.ReadAddress <=
+    to_integer(unsigned(if_Ethernet.rx_addr(c_REGISTER_ADDRESS_MSB-1 downto 0)));
+  if_RegSpace.WriteData   <= if_Ethernet.rx_data;
+  if_RegSpace.WriteEnable <= if_Ethernet.rx_wren;
+  if_Ethernet.tx_data <= if_RegSpace.ReadData;
 
   if_Ethernet.b_data    <= sig_axis_EthernetPayload_PhyClk_tdata;
   if_Ethernet.b_data_we <= sig_axis_EthernetPayload_PhyClk_tvalid;
@@ -552,10 +632,10 @@ begin
     adc_data_fast_sync           <= fast_sync_bus_out(3 downto 0);
 
     -- Allow operation from both VIO and MB
+    ctrl_EthDataGenEnable         <= vio_out_EthDataGenEnable;
+    ctrl_FlipDdrPolarity          <= vio_out_FlipDdrPolarity_sync;
     ctrl_PhaseShiftBackwardButton <= vio_out_PhaseShiftBackwardButton or if_MbGpio.PhaseShiftBackwardButton;
     ctrl_PhaseShiftForwardButton  <= vio_out_PhaseShiftForwardButton or if_MbGpio.PhaseShiftForwardButton;
-    ctrl_FlipDdrPolarity          <= vio_out_FlipDdrPolarity_sync;
-    ctrl_EthDataGenEnable         <= vio_out_EthDataGenEnable;
     ctrl_SampleRateSelect         <= vio_out_SampleRateSelect;
     if_Ethernet.gel_reset_in      <= vio_out_PhyResetSig_sync;
 
@@ -629,6 +709,7 @@ begin
     --    probe2(0) => adc_frame_clk_fast_sync
     --    );
 
+    sig_AdcDataPerChannel <= f_Channelize(sig_axis_AdcData_MasterClk_tdata);
     ila_0_inst_0 : entity work.ila_0
       port map(
         clk        => clk_MAIN,
