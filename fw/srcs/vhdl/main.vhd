@@ -162,10 +162,6 @@ architecture rtl of main is
   signal sig_axis_AdcData_MasterClk_tdata  : std_logic_vector(c_MSB-1 downto 0);
   -- </.>
 
-  -- Sequencer data Input
-  -- Splits large std_logic_vector into per_channel ADC words
-  signal sig_AdcDataPerChannel : t_ADC_BUS(0 to c_NUM_ADC_CHANNELS-1);
-
   -- <Raw Sequencer Output>
   signal sig_SequencerOut     : std_logic_vector(c_ADC_BITS-1 downto 0) := (others => '0');
   signal sig_SequencerValid   : std_logic                               := '0';
@@ -247,6 +243,11 @@ architecture rtl of main is
   signal vio_out_PhyResetSig              : std_logic := '1';
   signal vio_out_PhyResetSig_sync         : std_logic := '1';
   signal vio_out_EthDataGenEnable         : std_logic := '0';
+
+  -- Sequencer data Input
+  -- Splits large std_logic_vector into per_channel ADC words
+  signal sig_AdcDataPerChannel : t_ADC_BUS(0 to c_NUM_ADC_CHANNELS-1);
+
 
   -- Test data generator for ethernet interface
   -- Most useful when ADC wasn't yet working. Now deprecated.
@@ -422,14 +423,6 @@ begin
       m_axis_tdata   => sig_axis_AdcData_MasterClk_tdata);
   -- </.>
 
-  -- <Reserialize deserialized data per ADC channel>
-  gen_ChannelizeAdcData : for ii in 0 to c_NUM_ADC_CHANNELS - 1 generate
-    constant msb : natural := c_ADC_BITS*(c_NUM_ADC_CHANNELS - ii);
-    constant lsb : natural := c_ADC_BITS*(c_NUM_ADC_CHANNELS - ii - 1);
-  begin
-    sig_AdcDataPerChannel(ii) <= sig_axis_AdcData_MasterClk_tdata(msb - 1 downto lsb);
-  end generate gen_ChannelizeAdcData;
-  -- </.>
 
   -- <Assign channel to ADC data>
   mod_Sequencer : entity work.sequencer
@@ -438,24 +431,14 @@ begin
       )
     port map (
       clk               => clk_MAIN,
-      valid_in          => sig_axis_AdcData_MasterClk_tvalid,
       ready_in          => sig_axis_PacketizedData_MasterClk_tready,
-      input_bus         => sig_AdcDataPerChannel,
+      valid_in          => sig_axis_AdcData_MasterClk_tvalid,
+      input_bus         => f_Channelize(sig_axis_AdcData_MasterClk_tdata),
       valid_out         => sig_SequencerValid,
       output_data       => sig_SequencerOut,
       sequencer_channel => sig_SequencerChannel
       );
   -- </.>
-
-  -- <Generate timestamp and test data for ethernet>
-  p_GenerateTimestamp : process(clk_MAIN) is
-    variable counter : natural := 0;
-  begin
-    if rising_edge(clk_MAIN) then
-      counter       := counter + 1;
-      sig_Timestamp <= std_logic_vector(to_unsigned(counter, c_BITS_TIMESTAMP));
-    end if;
-  end process p_GenerateTimestamp;
 
   p_GenTestData : process(clk_MAIN) is
   begin
@@ -677,6 +660,7 @@ begin
     --    probe2(0) => adc_frame_clk_fast_sync
     --    );
 
+    sig_AdcDataPerChannel <= f_Channelize(sig_axis_AdcData_MasterClk_tdata);
     ila_0_inst_0 : entity work.ila_0
       port map(
         clk        => clk_MAIN,
