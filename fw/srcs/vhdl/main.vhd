@@ -17,7 +17,7 @@
 -- Author     : Javier Contreras 52425N
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-05-22
--- Last update: 2025-07-30
+-- Last update: 2025-07-31
 -- Standard   : VHDL'08
 -------------------------------------------------------------------------------
 -- Description: Configures ADS9813 ADC and transmits incoming data (+ timestamp)
@@ -118,7 +118,6 @@ architecture rtl of main is
   signal if_MbGpio    : t_MB_GPIO;
   -- </.>
 
-
   -- <SPI interfaces>
   signal if_AdcSpiCtrl_Microblaze : t_ADC_CTRL;
   signal if_AdcSpiCtrl_Hdl        : t_ADC_CTRL;
@@ -211,8 +210,8 @@ architecture rtl of main is
   -- Selector for sample clock mux (4MHz/8MHz)
   signal ctrl_SampleRateSelect : std_logic := '0';
 
-  -- Selects whether Microblaze runs SPI or the HDL
-  signal ctrl_SelectSpiSource : std_logic := '0';
+  -- Enables timestamp counter
+  signal ctrl_TimestampEnable : std_logic := '1';
 
 --  ____       _
 -- |  _ \  ___| |__  _   _  __ _
@@ -583,10 +582,10 @@ begin
     adc_data_fast_sync           <= fast_sync_bus_out(3 downto 0);
 
     -- Allow operation from both VIO and MB
+    ctrl_EthDataGenEnable         <= vio_out_EthDataGenEnable;
+    ctrl_FlipDdrPolarity          <= vio_out_FlipDdrPolarity_sync;
     ctrl_PhaseShiftBackwardButton <= vio_out_PhaseShiftBackwardButton or if_MbGpio.PhaseShiftBackwardButton;
     ctrl_PhaseShiftForwardButton  <= vio_out_PhaseShiftForwardButton or if_MbGpio.PhaseShiftForwardButton;
-    ctrl_FlipDdrPolarity          <= vio_out_FlipDdrPolarity_sync;
-    ctrl_EthDataGenEnable         <= vio_out_EthDataGenEnable;
     ctrl_SampleRateSelect         <= vio_out_SampleRateSelect;
     if_Ethernet.gel_reset_in      <= vio_out_PhyResetSig_sync;
 
