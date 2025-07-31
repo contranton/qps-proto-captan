@@ -16,22 +16,22 @@ module deser_cmos (
                    output [191:0] DOUT // deserialized output
                    );
 
-   ila_deser ila_deser_1 (
-      .clk    (DCLK),
-      .probe0 (pos_DIN_A),
-      .probe1 (neg_DIN_A),
-      .probe2 (pos_DIN_B),
-      .probe3 (neg_DIN_B),
-      .probe4 (pos_DIN_C),
-      .probe5 (neg_DIN_C),
-      .probe6 (pos_DIN_D),
-      .probe7 (neg_DIN_D),
-      .probe8 (pos_CMOS_FCLK),
-      .probe9 (neg_CMOS_FCLK),
-      .probe10 (DRDY),
-      .probe11 (DOUT),
-      .probe12 (FCLK_pos)
-      );
+//   ila_deser ila_deser_1 (
+//      .clk    (DCLK),
+//      .probe0 (pos_DIN_A),
+//      .probe1 (neg_DIN_A),
+//      .probe2 (pos_DIN_B),
+//      .probe3 (neg_DIN_B),
+//      .probe4 (pos_DIN_C),
+//      .probe5 (neg_DIN_C),
+//      .probe6 (pos_DIN_D),
+//      .probe7 (neg_DIN_D),
+//      .probe8 (pos_CMOS_FCLK),
+//      .probe9 (neg_CMOS_FCLK),
+//      .probe10 (DRDY),
+//      .probe11 (DOUT),
+//      .probe12 (FCLK_pos)
+//      );
 
 
    // IDDR  instantiation
