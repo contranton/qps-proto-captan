@@ -463,10 +463,13 @@ begin
       clk => clk_PHY,
       if_RegSpace => if_RegSpace);
 
-  if_RegSpace.ReadAddress <= if_Ethernet.rx_addr;
+  -- TODO: The incoming ots address is 32 bits. SHould I extract only the sub-address I need?
+  -- I.e. how to reconstrain the input data without overflowing?
+  if_RegSpace.ReadAddress <=
+    to_integer(unsigned(if_Ethernet.rx_addr(c_REGISTER_ADDRESS_MSB-1 downto 0)));
   if_RegSpace.WriteData   <= if_Ethernet.rx_data;
   if_RegSpace.WriteEnable <= if_Ethernet.rx_wren;
-  if_RegSpace.ReadData    <= if_Ethernet.tx_data;
+  if_Ethernet.tx_data <= if_RegSpace.ReadData;
 
   if_Ethernet.b_data    <= sig_axis_EthernetPayload_PhyClk_tdata;
   if_Ethernet.b_data_we <= sig_axis_EthernetPayload_PhyClk_tvalid;
