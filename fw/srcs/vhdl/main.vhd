@@ -32,6 +32,7 @@
 
 use work.qps_pkg.all;
 use work.ads9813_pkg.all;
+use work.register_space_pkg.all;
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -137,6 +138,10 @@ architecture rtl of main is
       TestPatternCh1To4 => c_INITIAL_TEST_PATTERN_CH1_4,
       TestPatternCh5To8 => c_INITIAL_TEST_PATTERN_CH5_8
       );
+
+  -- <Register space interface>
+  signal if_RegSpace : t_CONFIG_REGISTER_INTERFACE;
+
   -- </.>
 
 --  __  __       _             _       _           __ _
@@ -513,6 +518,19 @@ begin
       PHY_TXD    => phy_tx.PHY_TXD,
       PHY_TX_EN  => phy_tx.PHY_TXCTL_TXEN,
       PHY_TX_ER  => phy_tx.PHY_TXER);
+
+  mod_RegisterSpace : entity work.register_space
+    port map(
+      clk => clk_PHY,
+      if_RegSpace => if_RegSpace);
+
+  -- TODO: The incoming ots address is 32 bits. SHould I extract only the sub-address I need?
+  -- I.e. how to reconstrain the input data without overflowing?
+  if_RegSpace.ReadAddress <=
+    to_integer(unsigned(if_Ethernet.rx_addr(c_REGISTER_ADDRESS_MSB-1 downto 0)));
+  if_RegSpace.WriteData   <= if_Ethernet.rx_data;
+  if_RegSpace.WriteEnable <= if_Ethernet.rx_wren;
+  if_Ethernet.tx_data <= if_RegSpace.ReadData;
 
   if_Ethernet.b_data    <= sig_axis_EthernetPayload_PhyClk_tdata;
   if_Ethernet.b_data_we <= sig_axis_EthernetPayload_PhyClk_tvalid;
