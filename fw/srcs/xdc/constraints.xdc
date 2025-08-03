@@ -1,27 +1,27 @@
 # SampleClock is 8MHz
 # FrameClock is SampleClock/4 = 2.00MHz
-# create_clock -period 500.000 -name ADC_FRAMECLK [get_ports adc_frame_clk]
+# create_clock -period 500.000 -name ADC_FRAMECLK [get_ports clk_ADC_FRAME]
 # DataClock is FrameClock * 24 (Config = SDR + 4 lanes) =  60MHz
 # Assume SDR with faster clock for higher design flexibility (live SDR/DDR switching).
 # Commented out since clk_wiz_phase_shift overrides
-#create_clock -period 16.667 -name ADC_DATACLK [get_ports adc_data_clk]
+#create_clock -period 16.667 -name ADC_DATACLK [get_ports clk_ADC_DATA]
 
-#set_clock_groups -asynchronous -group [get_clocks -of_objects [get_nets {MASTER_CLK adc_data_clk}]]
-#set_clock_groups -asynchronous -group [get_clocks -of_objects [get_nets {MASTER_CLK adc_frame_clk}]]
+#set_clock_groups -asynchronous -group [get_clocks -of_objects [get_nets {MASTER_CLK clk_ADC_DATA}]]
+#set_clock_groups -asynchronous -group [get_clocks -of_objects [get_nets {MASTER_CLK clk_ADC_FRAME}]]
 
 create_generated_clock \
-    -name adc_sample_clk_8mhz \
+    -name clk_ADC_SAMPLING_8MHZ \
     -source [get_pins pll_MainClocks/clk_out_16] \
-    [get_pins adc_sample_clk_8mhz_reg/Q] \
+    [get_pins clk_ADC_SAMPLING_8MHZ_reg/Q] \
     -divide_by 2
 
 create_generated_clock \
-    -name adc_sample_clk_4mhz \
-    -source [get_pins adc_sample_clk_8mhz_reg/Q] \
-    [get_pins adc_sample_clk_4mhz_reg/Q] \
+    -name clk_ADC_SAMPLING_4MHZ \
+    -source [get_pins clk_ADC_SAMPLING_8MHZ_reg/Q] \
+    [get_pins clk_ADC_SAMPLING_4MHZ_reg/Q] \
     -divide_by 2
 
-set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets adc_data_clk_IBUF]
+set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets clk_ADC_DATA_IBUF]
 
 #set_input_delay -clock ADC_DATACLK 30 [get_ports adc_data[*]]
 
@@ -47,14 +47,14 @@ set_property IOSTANDARD LVCMOS18 [get_ports adc_pwdn_n]
 set_property PACKAGE_PIN Y8 [get_ports adc_reset_n]
 set_property IOSTANDARD LVCMOS18 [get_ports adc_reset_n]
 
-set_property PACKAGE_PIN AA10 [get_ports adc_sample_clk]
-set_property IOSTANDARD LVCMOS18 [get_ports adc_sample_clk]
+set_property PACKAGE_PIN AA10 [get_ports clk_ADC_SAMPLING]
+set_property IOSTANDARD LVCMOS18 [get_ports clk_ADC_SAMPLING]
 
-set_property PACKAGE_PIN V9 [get_ports adc_frame_clk]
-set_property IOSTANDARD LVCMOS18 [get_ports adc_frame_clk]
+set_property PACKAGE_PIN V9 [get_ports clk_ADC_FRAME]
+set_property IOSTANDARD LVCMOS18 [get_ports clk_ADC_FRAME]
 
-set_property PACKAGE_PIN W6 [get_ports adc_data_clk]
-set_property IOSTANDARD LVCMOS18 [get_ports adc_data_clk]
+set_property PACKAGE_PIN W6 [get_ports clk_ADC_DATA]
+set_property IOSTANDARD LVCMOS18 [get_ports clk_ADC_DATA]
 
 set_property PACKAGE_PIN AK3 [get_ports {adc_spi_ctrl[SDI]}]
 set_property IOSTANDARD LVCMOS18 [get_ports {adc_spi_ctrl[SDI]}]
