@@ -17,7 +17,7 @@
 -- Author     : Javier Contreras 52425N
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-05-22
--- Last update: 2025-07-31
+-- Last update: 2025-08-01
 -- Standard   : VHDL'08
 -------------------------------------------------------------------------------
 -- Description: Configures ADS9813 ADC and transmits incoming data (+ timestamp)
@@ -54,8 +54,8 @@ entity main is
     user_led  : out std_logic;
 
     -- ADC data interface
-    adc_frame_clk : in  std_logic;
-    adc_data_clk  : in  std_logic;
+    clk_ADC_FRAME : in  std_logic;
+    clk_ADC_DATA  : in  std_logic;
     adc_data      : in  t_ADC_RAW_DATA(3 downto 0);
     adc_pwdn_n    : out std_logic;
     adc_reset_n   : out std_logic;
@@ -64,7 +64,7 @@ entity main is
     adc_spi_ctrl : inout t_ADC_CTRL;
 
     -- Outgoing sample clock
-    adc_sample_clk : out std_logic;
+    clk_ADC_SAMPLING : out std_logic;
 
     -- GEL Ethernet interface
     phy_rx    : in  t_GEL_PHY_RX;
@@ -79,7 +79,7 @@ architecture rtl of main is
   signal clk_MAIN        : std_logic;
   signal clk_FAST        : std_logic;
   signal clk_PHY         : std_logic;
-  signal clk_ADC_SHIFTED : std_logic;  -- Data clock shifted to align with data lanes
+  signal clk_ADC_DATA_SHIFTED : std_logic;  -- Data clock shifted to align with data lanes
   -- </.>
 
   -- <Resets>
@@ -91,11 +91,11 @@ architecture rtl of main is
   -- </.>
 
   -- <Outgoing clocks>
-  signal adc_sample_clk_4mhz         : std_logic := '0';
-  signal adc_sample_clk_16mhz_prebuf : std_logic := '0';
-  signal adc_sample_clk_8mhz         : std_logic := '0';
-  signal adc_sample_clk_16mhz        : std_logic := '0';
-  signal phy_txclk_prebuf            : std_logic := '0';
+  signal clk_ADC_SAMPLING_4MHZ         : std_logic := '0';
+  signal clk_ADC_SAMPLING_16MHZ_prebuf : std_logic := '0';
+  signal clk_ADC_SAMPLING_8MHZ         : std_logic := '0';
+  signal clk_ADC_SAMPLING_16MHZ        : std_logic := '0';
+  signal clk_PHY_TX_prebuf            : std_logic := '0';
   -- </.>
 
 --  __  __           _       _
@@ -229,14 +229,14 @@ architecture rtl of main is
 --                         |___/
 
   -- Synchronized data/frame clocks for ILA
-  signal adc_data_clk_sync       : std_logic := '0';
-  signal adc_frame_clk_sync      : std_logic := '0';
-  signal adc_data_clk_fast_sync  : std_logic := '0';
-  signal adc_frame_clk_fast_sync : std_logic := '0';
+  signal clk_ADC_DATA_sync       : std_logic := '0';
+  signal clk_ADC_FRAME_sync      : std_logic := '0';
+  signal clk_ADC_DATA_fast_sync  : std_logic := '0';
+  signal clk_ADC_FRAME_fast_sync : std_logic := '0';
   signal adc_data_fast_sync      : std_logic_vector(3 downto 0);
   signal fast_sync_bus_in        : std_logic_vector(5 downto 0);
   signal fast_sync_bus_out       : std_logic_vector(5 downto 0);
-  signal adc_data_clk_buf4cdc    : std_logic := '0';
+  signal clk_ADC_DATA_buf4cdc    : std_logic := '0';
 
   -- VIO signals
   signal vio_out_PhaseShiftBackwardButton : std_logic := '0';
@@ -279,7 +279,7 @@ begin
       clk_in_100  => USER_CLK1,
       clk_out_200 => clk_FAST,
       clk_out_150 => clk_MAIN,
-      clk_out_16  => adc_sample_clk_16mhz_prebuf
+      clk_out_16  => clk_ADC_SAMPLING_16MHZ_prebuf
       );
 
   pll_PhyClock : entity work.clk_wiz_phy2adc
@@ -289,29 +289,54 @@ begin
       clk_out_125 => clk_PHY
       );
 
-  p_DivideSampleClock16To8 : process (adc_sample_clk_16mhz)
+  p_DivideSampleClock16To8 : process (clk_ADC_SAMPLING_16MHZ)
   -- Divide to 8MHz
   begin
-    if rising_edge(adc_sample_clk_16mhz) then
-      adc_sample_clk_8mhz <= not adc_sample_clk_8mhz;
+    if rising_edge(clk_ADC_SAMPLING_16MHZ) then
+      clk_ADC_SAMPLING_8MHZ <= not clk_ADC_SAMPLING_8MHZ;
     end if;
   end process p_DivideSampleClock16To8;
 
-  p_DivideSampleClock8To4 : process (adc_sample_clk_8mhz)
+  p_DivideSampleClock8To4 : process (clk_ADC_SAMPLING_8MHZ)
   -- Divide to 4MHz
   begin
-    if rising_edge(adc_sample_clk_8mhz) then
-      adc_sample_clk_4mhz <= not adc_sample_clk_4mhz;
+    if rising_edge(clk_ADC_SAMPLING_8MHZ) then
+      clk_ADC_SAMPLING_4MHZ <= not clk_ADC_SAMPLING_4MHZ;
     end if;
   end process p_DivideSampleClock8To4;
 
   -- Mux sample clock
   with ctrl_SampleRateSelect select
-    adc_sample_clk <= adc_sample_clk_8mhz when '1',
-                      adc_sample_clk_4mhz when '0',
+    clk_ADC_SAMPLING <= clk_ADC_SAMPLING_8MHZ when '1',
+                      clk_ADC_SAMPLING_4MHZ when '0',
                       '0'                 when others;
   -- </.> --
 
+--    _____ _____ ____ _____   _____ _   _ _____
+--   |_   _| ____/ ___|_   _| |_   _| | | | ____|
+--     | | |  _| \___ \ | |     | | | |_| |  _|
+--     | | | |___ ___) || |     | | |  _  | |___
+--     |_| |_____|____/ |_|     |_| |_| |_|_____|
+--
+--    _____ ___ ____  __  ____        ___    ____  _____
+--   |  ___|_ _|  _ \|  \/  \ \      / / \  |  _ \| ____|
+--   | |_   | || |_) | |\/| |\ \ /\ / / _ \ | |_) |  _|
+--   |  _|  | ||  _ <| |  | | \ V  V / ___ \|  _ <| |___
+--   |_|   |___|_| \_\_|  |_|  \_/\_/_/   \_\_| \_\_____|
+--
+--    ____  _____ _____ ___  ____  _____    ____  ___ ___ _   _  ____   _____ ___
+--   | __ )| ____|  ___/ _ \|  _ \| ____|  / ___|/ _ \_ _| \ | |/ ___| |_   _/ _ \
+--   |  _ \|  _| | |_ | | | | |_) |  _|   | |  _| | | | ||  \| | |  _    | || | | |
+--   | |_) | |___|  _|| |_| |  _ <| |___  | |_| | |_| | || |\  | |_| |   | || |_| |
+--   |____/|_____|_|   \___/|_| \_\_____|  \____|\___/___|_| \_|\____|   |_| \___/
+--
+--       _    ____  ____      _____ ____
+--      / \  |  _ \/ ___|    |_   _|  _ \
+--     / _ \ | |_) \___ \ _____| | | | | |
+--    / ___ \|  __/ ___) |_____| | | |_| |
+--   /_/   \_\_|   |____/      |_| |____/
+--
+  
   -- <SPI module for ADC configuration>
   gen_Spi : if c_USE_MICROBLAZE_SPI = '0' generate
     adc_spi_ctrl <= if_AdcSpiCtrl_Hdl;
@@ -377,14 +402,14 @@ begin
       );
 
   pll_PhaseShift : entity work.clk_wiz_phase_shift
-    -- Clocking wizard exclusively to phase_shift adc_data_clk
+    -- Clocking wizard exclusively to phase_shift clk_ADC_DATA
     port map(
       psen          => if_PhaseShift.enable,
       psclk         => clk_MAIN,
       psdone        => if_PhaseShift.done,
       psincdec      => if_PhaseShift.incdec,
-      clk_in_48     => adc_data_clk,
-      clk_out_shift => clk_ADC_SHIFTED,
+      clk_in_48     => clk_ADC_DATA,
+      clk_out_shift => clk_ADC_DATA_SHIFTED,
       reset         => vio_out_ClkWizPhaseShiftReset,
       locked        => vio_in_ClkWizPhaseShiftLocked
       );
@@ -426,8 +451,8 @@ begin
       CMOS_DIN_B        => adc_data(1),
       CMOS_DIN_C        => adc_data(2),
       CMOS_DIN_D        => adc_data(3),
-      DCLK              => clk_ADC_SHIFTED,
-      FCLK              => adc_frame_clk,
+      DCLK              => clk_ADC_DATA_SHIFTED,
+      FCLK              => clk_ADC_FRAME,
       data_rate         => '0',         -- 0: DDR, 1: SDR
       data_lanes        => "10",        -- 4 lanes
       flip_ddr_polarity => ctrl_FlipDdrPolarity,
@@ -439,7 +464,7 @@ begin
   mod_PulseShorten_AdcDataValid : entity work.pulse_shorten
     -- Ensures tvalid is single clock pulse to avoid reading wrong data
     port map(
-      clk      => clk_ADC_SHIFTED,
+      clk      => clk_ADC_DATA_SHIFTED,
       src_in   => sig_axis_AdcData_AdcClk_tvalid,
       dest_out => sig_axis_AdcData_AdcClk_tvalid_pulse
       );
@@ -449,7 +474,7 @@ begin
   fifo_Adc2Master_AdcData : entity work.fifo_0
     port map (
       s_axis_aresetn => resetn,
-      s_axis_aclk    => clk_ADC_SHIFTED,
+      s_axis_aclk    => clk_ADC_DATA_SHIFTED,
       s_axis_tvalid  => sig_axis_AdcData_AdcClk_tvalid_pulse,
       s_axis_tready  => sig_axis_AdcData_AdcClk_tready,
       s_axis_tdata   => sig_axis_AdcData_AdcClk_tdata,
@@ -546,14 +571,14 @@ begin
       PHY_RXD    => phy_rx.PHY_RXD,
       PHY_RX_DV  => phy_rx.PHY_RXCTL_RXDV,
       PHY_RX_ER  => '0',
-      TX_CLK     => phy_txclk_prebuf,   -- Sent to OBUF before phy_tx.PHY_TXCLK
+      TX_CLK     => clk_PHY_TX_prebuf,   -- Sent to OBUF before phy_tx.PHY_TXCLK
       PHY_TXD    => phy_tx.PHY_TXD,
       PHY_TX_EN  => phy_tx.PHY_TXCTL_TXEN,
       PHY_TX_ER  => phy_tx.PHY_TXER);
 
   mod_RegisterSpace : entity work.register_space
     port map(
-      clk => clk_PHY,
+      clk         => clk_PHY,
       if_RegSpace => if_RegSpace);
 
   -- TODO: The incoming ots address is 32 bits. SHould I extract only the sub-address I need?
@@ -576,7 +601,7 @@ begin
       src_clk  => clk_MAIN,
       src_in   => reset,
       dest_out => reset_sync_adc,
-      dest_clk => clk_ADC_SHIFTED
+      dest_clk => clk_ADC_DATA_SHIFTED
       );
 
   sync_Main2Adc_PhaseShiftDone : xpm_cdc_single
@@ -585,7 +610,7 @@ begin
       src_clk  => clk_MAIN,
       src_in   => if_PhaseShift.done,
       dest_out => if_PhaseShift_done_sync,
-      dest_clk => clk_ADC_SHIFTED
+      dest_clk => clk_ADC_DATA_SHIFTED
       );
 
   -- </.>
@@ -593,8 +618,8 @@ begin
   -- <Output Buffers>
   obuf_SampleClock : OBUF
     port map (
-      I => adc_sample_clk_16mhz_prebuf,
-      O => adc_sample_clk_16mhz);
+      I => clk_ADC_SAMPLING_16MHZ_prebuf,
+      O => clk_ADC_SAMPLING_16MHZ);
 
   obuf_PhyReset : OBUF
     port map(
@@ -603,7 +628,7 @@ begin
 
   obuf_PhyTxClk : OBUF
     port map(
-      I => phy_txclk_prebuf,
+      I => clk_PHY_TX_prebuf,
       O => phy_tx.PHY_TXCLK);
   -- </.>
 
@@ -624,11 +649,11 @@ begin
 
   else generate
 
-    fast_sync_bus_in(5)          <= clk_ADC_SHIFTED;
-    fast_sync_bus_in(4)          <= adc_frame_clk;
+    fast_sync_bus_in(5)          <= clk_ADC_DATA_SHIFTED;
+    fast_sync_bus_in(4)          <= clk_ADC_FRAME;
     fast_sync_bus_in(3 downto 0) <= std_logic_vector(adc_data);
-    adc_data_clk_fast_sync       <= fast_sync_bus_out(5);
-    adc_frame_clk_fast_sync      <= fast_sync_bus_out(4);
+    clk_ADC_DATA_fast_sync       <= fast_sync_bus_out(5);
+    clk_ADC_FRAME_fast_sync      <= fast_sync_bus_out(4);
     adc_data_fast_sync           <= fast_sync_bus_out(3 downto 0);
 
     -- Allow operation from both VIO and MB
@@ -640,7 +665,7 @@ begin
     if_Ethernet.gel_reset_in      <= vio_out_PhyResetSig_sync;
 
     bufg_DataClockDebug : BUFG
-      port map(I => clk_ADC_SHIFTED, O => adc_data_clk_buf4cdc);
+      port map(I => clk_ADC_DATA_SHIFTED, O => clk_ADC_DATA_buf4cdc);
 
     sync_Async2Fast_FastSyncBus : xpm_cdc_array_single
       generic map(SRC_INPUT_REG => 0, DEST_SYNC_FF => 2, WIDTH => 6)
@@ -656,8 +681,8 @@ begin
       port map(
         src_clk  => '0',
         dest_clk => clk_MAIN,
-        src_in   => adc_data_clk_buf4cdc,
-        dest_out => adc_data_clk_sync
+        src_in   => clk_ADC_DATA_buf4cdc,
+        dest_out => clk_ADC_DATA_sync
         );
 
     sync_Async2Main_FrameClockDebug : xpm_cdc_single
@@ -665,15 +690,15 @@ begin
       port map(
         src_clk  => '0',
         dest_clk => clk_MAIN,
-        src_in   => adc_frame_clk,
-        dest_out => adc_frame_clk_sync
+        src_in   => clk_ADC_FRAME,
+        dest_out => clk_ADC_FRAME_sync
         );
 
     sync_Main2Adc_VioFlipDdrOPolarity : xpm_cdc_single
       generic map(SRC_INPUT_REG => 0, DEST_SYNC_FF => 2)
       port map(
         src_clk  => clk_MAIN,
-        dest_clk => clk_ADC_SHIFTED,
+        dest_clk => clk_ADC_DATA_SHIFTED,
         src_in   => vio_out_FlipDdrPolarity,
         dest_out => vio_out_FlipDdrPolarity_sync
         );
@@ -705,8 +730,8 @@ begin
     --  port map(
     --    clk       => clk_FAST,
     --    probe0    => adc_data_fast_sync,
-    --    probe1(0) => adc_data_clk_fast_sync,
-    --    probe2(0) => adc_frame_clk_fast_sync
+    --    probe1(0) => clk_ADC_DATA_fast_sync,
+    --    probe2(0) => clk_ADC_FRAME_fast_sync
     --    );
 
     sig_AdcDataPerChannel <= f_Channelize(sig_axis_AdcData_MasterClk_tdata);
@@ -723,8 +748,8 @@ begin
         probe7     => std_logic_vector(sig_AdcDataPerChannel(7)),
         probe8     => "0000",
         probe9(0)  => sig_axis_AdcData_MasterClk_tvalid,
-        probe10(0) => adc_data_clk_sync,
-        probe11(0) => adc_frame_clk_sync,
+        probe10(0) => clk_ADC_DATA_sync,
+        probe11(0) => clk_ADC_FRAME_sync,
         probe12    => sig_axis_AdcData_MasterClk_tdata
         );
 
@@ -744,8 +769,8 @@ begin
         clk           => clk_MAIN,
         probe_in0(0)  => '0',
         probe_in1(0)  => '0',
-        probe_in2(0)  => '0',           --adc_frame_clk,
-        probe_in3(0)  => '0',           --adc_data_clk,
+        probe_in2(0)  => '0',           --clk_ADC_FRAME,
+        probe_in3(0)  => '0',           --clk_ADC_DATA,
         probe_in4(0)  => '0',           --sig_axis_AdcData_AdcClk_tvalid,
         probe_in5(0)  => '0',
         probe_out0(0) => vio_out_EthDataGenEnable,
