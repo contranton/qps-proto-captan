@@ -30,17 +30,6 @@ The complete flow is:
 
 Once running, otsdaq should be able to recognize the board with IP =192.168.133.7= and interface port =2007=. Using the =FEOtsUDPTemplateInterface= installed by =otsdaq-demo= with the =first_demo= dataset is sufficient to get a working data stream, but further customization is needed in otsdaq to interpret the data (WIP in <TBD> repository).
 
-Outgoing packets are as follows:
-#+begin_src mermaid
----
-title: "UDP Packet"
----
-packet
-   0-23: "ADC Data"
-   24-27: "Channel ID"
-   28-63: "Timestamp"
-#+end_src
-
 * Detailed operation instructions for debugging
 
 ** Environment Setup
