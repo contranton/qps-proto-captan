@@ -72,7 +72,7 @@ stateDiagram-v2
     %% s2 --> udp : Configure Ethernet
 #+end_src
 
-The `Run Alignment` task is described by the following steps:
+The `Run Alignment` task is described by the following steps (the ILA number and channel name are defiintely wrong but I can't find the correct values until I get my hands on the board again).
 
 #+begin_src mermaid
 ---
