@@ -302,7 +302,7 @@ begin
       clk_out_200 => clk_FAST,
       clk_out_150 => clk_MAIN,
       clk_out_16  => clk_ADC_SAMPLING_16MHZ_prebuf
-      )
+      );
 
   pll_PhyClock : entity work.clk_wiz_phy2adc
     -- Clocking wizard for clk_PHY generation

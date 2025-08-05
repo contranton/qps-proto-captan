@@ -29,3 +29,87 @@ The complete flow is:
 4. Data is timestamped and fed to the GEL's "burst mode" input
 
 Once running, otsdaq should be able to recognize the board with IP =192.168.133.7= and interface port =2007=. Using the =FEOtsUDPTemplateInterface= installed by =otsdaq-demo= with the =first_demo= dataset is sufficient to get a working data stream, but further customization is needed in otsdaq to interpret the data (WIP in <TBD> repository).
+
+* Detailed operation instructions for debugging
+
+** Environment Setup
+
+*** Install Vitis + Vivado
+
+TODO
+
+** Compile
+
+Only necessary if not using pre-built binaries.
+
+*** Firmware compilation
+
+*** Microblaze Software compilation
+
+** Program
+
+** Notes on DDR alignment routine
+
+This version of the design doesn't have autoalignment built-in yet. Therefore, there's a bit of an awkward procedure needed to get the correct data out of the system.
+
+The following diagram explains how the DDR can become misaligned.
+
+#+begin_src mermaid :file ~/.tmp/tmp.png
+stateDiagram-v2
+    state "FPGA Off" as s0
+    state "FPGA Uninitialized" as s1
+    state "FPGA programmed" as s2
+    state "DDR aligned" as ddr_good
+    state "DDR unaligned" as ddr_bad
+    %% state "UDP Stream" as udp
+    [*] --> s0
+    s0 --> s1 : Power on
+    s1 --> s2 : Download Bitstream
+    s2 --> ddr_bad
+    ddr_bad --> ddr_good : Run Alignment
+    ddr_good --> s1 : Reset FPGA
+    ddr_good --> ddr_good : Reset Microblaze
+    %% s2 --> udp : Configure Ethernet
+#+end_src
+
+The `Run Alignment` task is described by the following steps (the ILA number and channel name are defiintely wrong but I can't find the correct values until I get my hands on the board again).
+
+#+begin_src mermaid
+---
+Title: Run alignment
+---
+flowchart TB
+
+    subgraph compile_debug [Debug Microblaze]
+        direction LR
+        B[Compile Application]
+        B --> C[Debug NO RESET]
+        C --> D[Run processor]
+    end
+    A[Define DO_PHASE_SHIFT and set DO_TEST_PATTERN_FIXED=1]
+    A --> compile_debug
+    compile_debug --> E[Verify console reads 'Will phase shift']
+
+    subgraph verify_ila [Verify ILA]
+        direction LR
+        s[Open Hardware Manager]
+        s --> |'Debug probes not found?'| s2[Load .ltx probes]
+        s --> s3
+        s2 --> s3
+        s3[Open ILA #3]
+        s3 --> |Trigger| s4[Verify that 'f_Channelize' ports read '123456' and '789abc']
+    end
+
+    E --> verify_ila
+
+    verify_ila --> |Fail| F[Modify Angle, or repeat debug several times. The total phase shift accumulates after each time the Microblaze runs its code.]
+    F --> FF{Completely Lost?}
+    FF ---> |Yes| FFF[Reset FPGA and start from the top]
+    FF --> |No| H[Debug Microblaze]
+    H --> verify_ila
+    verify_ila --> |Pass| G[Undefine DO_PHASE_SHIFT and set DO_TEST_PATTERN_FIXED=0]
+    G --> I[Debug Microblaze]
+    I --> J[Configure Ethernet]
+    J --> K[Data stream will have the correct data]
+
+#+end_src
