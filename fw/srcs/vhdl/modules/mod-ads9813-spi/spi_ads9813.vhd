@@ -17,7 +17,7 @@
 -- Author     : Javier Contreras 52425N
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-07-29
--- Last update: 2025-07-30
+-- Last update: 2025-08-05
 -- Standard   : VHDL'08
 -------------------------------------------------------------------------------
 -- Description: Generates SPI transactions for ADC configuration. TX Only
@@ -40,16 +40,17 @@ entity SpiController_ADS9813 is
 
   port (
     clk              : in    std_logic;
-    FunctionAddress  : in    t_enum_ADS9813_SPI_FUNCTIONS;
-    triggerTx        : in    std_logic;
-    triggerRx        : in    std_logic;
-    readData         : out   std_logic_vector(23 downto 0);
+    if_Ads9813       : inout t_Ads9813;
     if_AdcUserConfig : in    t_ADC_USER_CONFIG;
     if_Spi           : inout t_SPI_MGT);
 
 end entity SpiController_ADS9813;
 
 architecture rtl of SpiController_ADS9813 is
+
+  signal FunctionAddress : t_enum_ADS9813_SPI_FUNCTIONS;
+  signal triggerTx, triggerRx : std_logic;
+  signal read_data : std_logic_vector(23 downto 0);
 
   -- <State Machine>
   type t_fsm_CommunicationState is (st_IDLE, st_TX, st_RX);
@@ -106,6 +107,10 @@ architecture rtl of SpiController_ADS9813 is
   end procedure proc_BufferReset;
 
 begin  -- architecture rtl
+
+  triggerRx <= if_Ads9813.triggerRx;
+  triggerTx <= if_Ads9813.triggerTx;
+  FunctionAddress <= if_Ads9813.FunctionAddress;
 
   p_fsm_Communication : process(clk) is
   begin

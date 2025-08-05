@@ -17,7 +17,7 @@
 -- Author     :   <javierc@correlator6.fnal.gov>
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-07-30
--- Last update: <date   >
+-- Last update: 2025-08-05
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
 -- Description: Commaands and state management for SPI interface
@@ -116,6 +116,13 @@ package ads9813_pkg is
     cmd_B2_INIT_2                        => (address => x"92", data => x"0002"),
     cmd_B2_INIT_3                        => (address => x"C5", data => x"0604")
     );
+
+  type t_Ads9813 is record
+    FunctionAddress : t_enum_ADS9813_SPI_FUNCTIONS;
+    triggerTx : std_logic;
+    triggerRx : std_logic;
+    readData : std_logic_vector(23 downto 0);
+  end record t_Ads9813;
 
 end package ads9813_pkg;
 

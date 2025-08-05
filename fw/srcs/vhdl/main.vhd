@@ -17,7 +17,7 @@
 -- Author     : Javier Contreras 52425N
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-05-22
--- Last update: 2025-08-01
+-- Last update: 2025-08-05
 -- Standard   : VHDL'08
 -------------------------------------------------------------------------------
 -- Description: Configures ADS9813 ADC and transmits incoming data (+ timestamp)
@@ -98,6 +98,7 @@ architecture rtl of main is
   signal clk_PHY_TX_prebuf            : std_logic := '0';
   -- </.>
 
+
 --  __  __           _       _
 -- |  \/  | ___   __| |_   _| | ___  ___
 -- | |\/| |/ _ \ / _` | | | | |/ _ \/ __|
@@ -129,12 +130,8 @@ architecture rtl of main is
   signal if_SpiHdlManager         : t_SPI_MGT;
   -- </.>
 
-
-  -- <ADC configuration>
-  signal sig_AdcFunctionAddress : t_enum_ADS9813_SPI_FUNCTIONS;
-  signal sig_AdcSpiTriggerTx    : std_logic;
-  signal sig_AdcSpiTriggerRx    : std_logic := '0';
-  signal sig_AdcReadData        : std_logic_vector(23 downto 0);
+  -- <ADS9813 configuration interface>
+  signal if_Ads9813: t_Ads9813;
 
   signal if_AdcUserConfig : t_ADC_USER_CONFIG :=
     (
@@ -224,6 +221,18 @@ architecture rtl of main is
   -- Starts autoalignment algorithm
   signal ctrl_AutoalignTrigger : std_logic := '0';
 
+--  ____  _        _
+-- / ___|| |_ __ _| |_ _   _ ___
+-- \___ \| __/ _` | __| | | / __|
+--  ___) | || (_| | |_| |_| \__ \
+-- |____/ \__\__,_|\__|\__,_|___/
+--
+
+  signal stat_QpsStatus : t_QpsStatus := (
+    AdcHasBeenInitialized => '0',
+    AdcDataIsAligned => '0'
+  );
+
 --  ____       _
 -- |  _ \  ___| |__  _   _  __ _
 -- | | | |/ _ \ '_ \| | | |/ _` |
@@ -274,6 +283,16 @@ begin
   adc_pwdn_n          <= '1';
   adc_reset_n         <= '1';
 
+  -- TODO: Modularize this pattern and add a wait condition
+  p_PowerOnInitialize : process(clk_MAIN) is
+    begin
+      if rising_edge(clk_MAIN) then
+       if stat_QpsStatus.AdcHasBeenInitialized = '0' then
+         if_Ads9813.FunctionAddress <= en_FUNCTION_INIT;
+         if_Ads9813.triggerTx <= '1';
+        end if;
+      end if;
+    end process p_PowerOnInitialize;
 
   -- <Generate Clocks> --
   pll_MainClocks : entity work.clk_wiz_usrclk2adc
@@ -283,7 +302,7 @@ begin
       clk_out_200 => clk_FAST,
       clk_out_150 => clk_MAIN,
       clk_out_16  => clk_ADC_SAMPLING_16MHZ_prebuf
-      );
+      )
 
   pll_PhyClock : entity work.clk_wiz_phy2adc
     -- Clocking wizard for clk_PHY generation
@@ -315,31 +334,7 @@ begin
                       '0'                 when others;
   -- </.> --
 
---    _____ _____ ____ _____   _____ _   _ _____
---   |_   _| ____/ ___|_   _| |_   _| | | | ____|
---     | | |  _| \___ \ | |     | | | |_| |  _|
---     | | | |___ ___) || |     | | |  _  | |___
---     |_| |_____|____/ |_|     |_| |_| |_|_____|
---
---    _____ ___ ____  __  ____        ___    ____  _____
---   |  ___|_ _|  _ \|  \/  \ \      / / \  |  _ \| ____|
---   | |_   | || |_) | |\/| |\ \ /\ / / _ \ | |_) |  _|
---   |  _|  | ||  _ <| |  | | \ V  V / ___ \|  _ <| |___
---   |_|   |___|_| \_\_|  |_|  \_/\_/_/   \_\_| \_\_____|
---
---    ____  _____ _____ ___  ____  _____    ____  ___ ___ _   _  ____   _____ ___
---   | __ )| ____|  ___/ _ \|  _ \| ____|  / ___|/ _ \_ _| \ | |/ ___| |_   _/ _ \
---   |  _ \|  _| | |_ | | | | |_) |  _|   | |  _| | | | ||  \| | |  _    | || | | |
---   | |_) | |___|  _|| |_| |  _ <| |___  | |_| | |_| | || |\  | |_| |   | || |_| |
---   |____/|_____|_|   \___/|_| \_\_____|  \____|\___/___|_| \_|\____|   |_| \___/
---
---       _    ____  ____      _____ ____
---      / \  |  _ \/ ___|    |_   _|  _ \
---     / _ \ | |_) \___ \ _____| | | | | |
---    / ___ \|  __/ ___) |_____| | | |_| |
---   /_/   \_\_|   |____/      |_| |____/
---
-  
+
   -- <SPI module for ADC configuration>
   gen_Spi : if c_USE_MICROBLAZE_SPI = '0' generate
     adc_spi_ctrl <= if_AdcSpiCtrl_Hdl;
@@ -365,10 +360,7 @@ begin
     mod_Ads9813Aspi : entity work.SpiController_ADS9813
       port map (
         clk              => clk_MAIN,
-        FunctionAddress  => sig_AdcFunctionAddress,
-        triggerTx        => sig_AdcSpiTriggerTx,
-        triggerRx        => sig_AdcSpiTriggerRx,
-        readData         => sig_AdcReadData,
+        if_Ads9813       => if_Ads9813,
         if_AdcUserConfig => if_AdcUserConfig,
         if_Spi           => if_SpiHdlManager);
 
@@ -425,12 +417,20 @@ begin
       clk                  => clk,
       reset                => reset,
       start                => start,
-      autoalign_trigger    => if_AutoalignControl.trigger,
-      autoalign_done       => if_AutoalignControl.done,
-      autoalign_error      => if_AutoalignControl.error_out,
-      gpio_set_test_data   => gpio_set_test_data,
-      gpio_unset_test_data => gpio_unset_test_data,
-      error_out            => error_out);
+      if_AutoalignCtrl     => if_AutoalignControl);
+
+  p_SendSpiDisableTestPattern: process(clk_MAIN) is
+    begin
+      if rising_edge(clk_MAIN) then
+        if stat_QpsStatus.AdcDataIsAligned = '0' then
+          if if_AutoalignControl.done = '1' then
+            stat_QpsStatus.AdcDataIsAligned <= '1';
+            if_Ads9813.FunctionAddress <= en_FUNCTION_DISABLE_TEST;
+            if_Ads9813.triggerTx <= '1';
+          end if;
+        end if;
+      end if;
+  end process p_SendSpiDisableTestPattern;
 
   mod_Autoalign : entity work.adc_autoalign
     generic map (

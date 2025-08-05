@@ -17,7 +17,7 @@
 -- Author     : Javier Contreras 52425N
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-07-31
--- Last update: 2025-07-31
+-- Last update: 2025-08-05
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
 -- Description: Generic package to handle custom register spaces with
@@ -75,6 +75,5 @@ package register_space_pkg is
     reg_PhaseShiftDegrees => en_READ_ONLY,
     reg_AutoalignEnable   => en_READ_WRITE
     );
-
 
 end package register_space_pkg;

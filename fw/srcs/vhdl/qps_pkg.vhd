@@ -17,7 +17,7 @@
 -- Author     :   <javierc@correlator6.fnal.gov>
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-05-22
--- Last update: 2025-08-01
+-- Last update: 2025-08-05
 -- Standard   : VHDL'08
 -------------------------------------------------------------------------------
 -- Description: This package defines types for a simple DAQ system based on
@@ -43,6 +43,11 @@ package qps_pkg is
 
   constant c_LOG2_CHANNELS : natural := integer(ceil(log2(real(c_NUM_ADC_CHANNELS))));
   constant c_BITS_TIMESTAMP : natural := 64 - c_ADC_BITS - c_LOG2_CHANNELS;
+
+  type t_QpsStatus is record
+    AdcHasBeenInitialized : std_logic;
+    AdcDataIsAligned: std_logic;
+  end record t_QpsStatus;
 
   subtype t_ADC_WORD is std_logic_vector(c_ADC_BITS - 1 downto 0);
 

@@ -17,7 +17,7 @@
 -- Author     :   <javierc@correlator6.fnal.gov>
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-07-28
--- Last update: 2025-07-29
+-- Last update: 2025-08-05
 -- Platform   :
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -39,9 +39,7 @@ entity autoalign_ctrl is
     clk                : in  std_logic;
     reset              : in  std_logic;
     start              : in  std_logic;
-    autoalign_trigger  : out std_logic;
-    autoalign_done     : in  std_logic;
-    autoalign_error    : in  std_logic;
+    if_AutoalignCtrl   : inout t_AutoalignCtrl;
     gpio_set_test_data : out std_logic;
     error_out          : out std_logic
     );
@@ -68,11 +66,11 @@ begin  -- architecture rtl
           when st_STANDBY =>
             if start then
               status             <= st_RUNNING;
-              autoalign_trigger  <= '1';
+              if_Autoalign.trigger  <= '1';
               gpio_set_test_data <= '1';
             end if;
           when st_RUNNING =>
-            if autoalign_done then
+            if if_Autoalign. then
               status             <= st_DONE;
               gpio_set_test_data <= '0';
               gpio_set_test_data <= '0';
