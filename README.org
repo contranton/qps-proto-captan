@@ -93,7 +93,8 @@ flowchart TB
     subgraph verify_ila [Verify ILA]
         direction LR
         s[Open Hardware Manager]
-        s --> |'Debug probes not found'| s2[Load .ltx probes]
+        s --> |'Debug probes not found?'| s2[Load .ltx probes]
+        s --> s3
         s2 --> s3
         s3[Open ILA #3]
         s3 --> |Trigger| s4[Verify that 'f_Channelize' ports read '123456' and '789abc']
