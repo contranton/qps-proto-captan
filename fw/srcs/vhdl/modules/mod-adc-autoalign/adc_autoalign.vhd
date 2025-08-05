@@ -17,7 +17,7 @@
 -- Author     : Javier Contreras 52425N
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-07-11
--- Last update: 2025-07-29
+-- Last update: 2025-08-01
 -- Standard   : VHDL'08
 -------------------------------------------------------------------------------
 -- Description: Shifts data_clk until test pattern reads correctly. This routine
@@ -45,16 +45,12 @@ entity adc_autoalign is
     c_TEST_PATTERN : std_logic_vector(191 downto 0) := x"123456123456123456123456789ABC789ABC789ABC789ABC"
     );
   port (
-    clk                         : in  std_logic;
-    reset                       : in  std_logic;
-    deserializer_raw_data       : in  std_logic_vector(191 downto 0);
-    deserializer_raw_data_valid : in  std_logic;
-    trigger                     : in  std_logic;
-    n_delays                    : out signed(15 downto 0);
-    autoalign_done              : out std_logic;
-    phase_shift_button_forward  : out std_logic;
-    phase_shift_button_backward : out std_logic;
-    phase_shift_done            : in  std_logic);
+    clk               : in    std_logic;
+    reset             : in    std_logic;
+    if_AutoalignCtrl  : inout t_AUTOALIGN_CTRL_IF;
+    if_PhaseShiftCtrl : inout t_PHASE_SHIFT_CTRL_IF;
+    dut_data          : in    std_logic_vector(191 downto 0);
+    dut_data_valid    : in    std_logic);
 
 end entity adc_autoalign;
 
@@ -83,6 +79,7 @@ architecture rtl of adc_autoalign is
   signal n_delays_center                : signed(15 downto 0) := to_signed(0, 16);
   signal n_delays_center_next           : signed(15 downto 0) := to_signed(0, 16);
 
+
 begin  -- architecture rtl
 
   p_regs : process(clk) is
@@ -103,6 +100,8 @@ begin  -- architecture rtl
         direction    <= direction_next;
         edge         <= edge_next;
         startup_case <= startup_case_next;
+
+        if_AutoalignCtrl.n_delays <= n_delays_center;
       end if;
     end if;
   end process p_regs;
@@ -157,32 +156,32 @@ begin  -- architecture rtl
   begin
 
     -- Defaults for combinational outputs
-    autoalign_done              <= '0';
-    phase_shift_button_forward  <= '0';
-    phase_shift_button_backward <= '0';
+    if_AutoalignCtrl.done              <= '0';
+    if_PhaseShiftCtrl.button_forward  <= '0';
+    if_PhaseShiftCtrl.button_backward <= '0';
 
     if state = SHIFT_CLOCK then
       if direction = BACKWARD then
         n_delays_current_next <= n_delays_current + 1;
-        phase_shift_button_backward <= '1';
+        if_PhaseShiftCtrl.button_backward <= '1';
         state_next <= WAIT_SHIFT_DONE;
       else
         n_delays_current_next <= n_delays_current - 1;
-        phase_shift_button_forward <= '1';
+        if_PhaseShiftCtrl.button_forward <= '1';
         state_next <= WAIT_SHIFT_DONE;
       end if;
     end if; -- SHIFT_CLOCK
 
     if state = WAIT_SHIFT_DONE then
-      if phase_shift_done = '1' then
+      if if_PhaseShiftCtrl.done = '1' then
         state_next <= READ_DATA;
       end if;
     end if; -- WAIT_SHIFT_DONE
 
-    if state = READ_DATA and deserializer_raw_data_valid = '1' then
+    if state = READ_DATA and dut_data_valid = '1' then
       state_next <= SHIFT_CLOCK;
 
-      if deserializer_raw_data = c_TEST_PATTERN then  -- match found
+      if dut_data = c_TEST_PATTERN then  -- match found
 
         -- Detect startup case
         if EDGE = NONE and n_delays_current = 0 then
@@ -236,12 +235,12 @@ begin  -- architecture rtl
     end if; -- READ_DATA
 
     if state = ALGO_DONE then
-      autoalign_done <= '1';
+      if_AutoalignCtrl.done <= '1';
       state_next <= IDLE;
     end if; -- ALGO_DONE
 
     if state = IDLE then
-      if trigger = '1' then
+      if if_AutoalignCtrl.trigger = '1' then
         state_next <= READ_DATA;
       end if;
     end if; -- IDLE

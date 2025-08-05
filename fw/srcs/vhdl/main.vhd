@@ -106,6 +106,7 @@ architecture rtl of main is
 --
 
   -- <PLL phase shift Interface>
+  signal if_PhaseShiftControl    : t_PHASE_SHIFT_CTRL_IF;
   signal if_PhaseShift           : t_PHASE_SHIFT_IF;
   signal if_PhaseShift_done_sync : std_logic;
   -- </.>
@@ -121,7 +122,6 @@ architecture rtl of main is
 
   -- <ADC autoaligner>
   signal if_AutoalignControl : t_AUTOALIGN_CTRL_IF;
-  signal if_Autoalign        : t_AUTOALIGN_IF;
 
   -- <SPI interfaces>
   signal if_AdcSpiCtrl_Microblaze : t_ADC_CTRL;
@@ -220,6 +220,9 @@ architecture rtl of main is
 
   -- Enables timestamp counter
   signal ctrl_TimestampEnable : std_logic := '1';
+
+  -- Starts autoalignment algorithm
+  signal ctrl_AutoalignTrigger : std_logic := '0';
 
 --  ____       _
 -- |  _ \  ___| |__  _   _  __ _
@@ -404,8 +407,8 @@ begin
   pll_PhaseShift : entity work.clk_wiz_phase_shift
     -- Clocking wizard exclusively to phase_shift clk_ADC_DATA
     port map(
-      psen          => if_PhaseShift.enable,
       psclk         => clk_MAIN,
+      psen          => if_PhaseShift.enable,
       psdone        => if_PhaseShift.done,
       psincdec      => if_PhaseShift.incdec,
       clk_in_48     => clk_ADC_DATA,
@@ -413,35 +416,32 @@ begin
       reset         => vio_out_ClkWizPhaseShiftReset,
       locked        => vio_in_ClkWizPhaseShiftLocked
       );
+  if_PhaseShiftControl.done <= if_PhaseShift.done;
   -- </.>
 
   -- <ADC Autoaligners>
-  mod_AutoalignControl: entity work.autoalign_ctrl
+  mod_AutoalignControl : entity work.autoalign_ctrl
     port map (
       clk                  => clk,
       reset                => reset,
       start                => start,
-      autoalign_trigger    => if_AutoalignControl.autoalign_trigger,
-      autoalign_done       => if_AutoalignControl.autoalign_done,
-      autoalign_error      => if_AutoalignControl.autoalign_error,
+      autoalign_trigger    => if_AutoalignControl.trigger,
+      autoalign_done       => if_AutoalignControl.done,
+      autoalign_error      => if_AutoalignControl.error_out,
       gpio_set_test_data   => gpio_set_test_data,
       gpio_unset_test_data => gpio_unset_test_data,
       error_out            => error_out);
 
-  mod_Autoalign: entity work.adc_autoalign
+  mod_Autoalign : entity work.adc_autoalign
     generic map (
       c_TEST_PATTERN => c_TEST_PATTERN)
     port map (
-      clk                         => clk,
+      clk                         => clk_MAIN,
       reset                       => reset,
-      deserializer_raw_data       => deserializer_raw_data,
-      deserializer_raw_data_valid => deserializer_raw_data_valid,
-      trigger                     => trigger,
-      n_delays                    => n_delays,
-      autoalign_done              => autoalign_done,
-      phase_shift_button_forward  => phase_shift_button_forward,
-      phase_shift_button_backward => phase_shift_button_backward,
-      phase_shift_done            => phase_shift_done);
+      if_AutoAlignCtrl            => if_AutoAlignControl,
+      if_PhaseShiftCtrl           => if_PhaseShiftControl,
+      dut_data                    => sig_axis_AdcData_MasterClk_tdata,
+      dut_data_valid              => sig_axis_AdcData_MasterClk_tvalid);
   -- </.>
 
   -- <ADC DDR Deserializer>
@@ -587,7 +587,7 @@ begin
     to_integer(unsigned(if_Ethernet.rx_addr(c_REGISTER_ADDRESS_MSB-1 downto 0)));
   if_RegSpace.WriteData   <= if_Ethernet.rx_data;
   if_RegSpace.WriteEnable <= if_Ethernet.rx_wren;
-  if_Ethernet.tx_data <= if_RegSpace.ReadData;
+  if_Ethernet.tx_data     <= if_RegSpace.ReadData;
 
   if_Ethernet.b_data    <= sig_axis_EthernetPayload_PhyClk_tdata;
   if_Ethernet.b_data_we <= sig_axis_EthernetPayload_PhyClk_tvalid;
