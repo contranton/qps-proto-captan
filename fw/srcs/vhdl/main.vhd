@@ -17,7 +17,7 @@
 -- Author     : Javier Contreras 52425N
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-05-22
--- Last update: 2025-08-05
+-- Last update: 2025-08-06
 -- Standard   : VHDL'08
 -------------------------------------------------------------------------------
 -- Description: Configures ADS9813 ADC and transmits incoming data (+ timestamp)
@@ -33,6 +33,7 @@
 use work.qps_pkg.all;
 use work.ads9813_pkg.all;
 use work.register_space_pkg.all;
+use work.autoalign_pkg.all;
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -412,13 +413,6 @@ begin
   -- </.>
 
   -- <ADC Autoaligners>
-  mod_AutoalignControl : entity work.autoalign_ctrl
-    port map (
-      clk                  => clk,
-      reset                => reset,
-      start                => start,
-      if_AutoalignCtrl     => if_AutoalignControl);
-
   p_SendSpiDisableTestPattern: process(clk_MAIN) is
     begin
       if rising_edge(clk_MAIN) then
@@ -433,12 +427,10 @@ begin
   end process p_SendSpiDisableTestPattern;
 
   mod_Autoalign : entity work.adc_autoalign
-    generic map (
-      c_TEST_PATTERN => c_TEST_PATTERN)
     port map (
       clk                         => clk_MAIN,
       reset                       => reset,
-      if_AutoAlignCtrl            => if_AutoAlignControl,
+      if_AutoAlignCtrl            => if_AutoalignControl,
       if_PhaseShiftCtrl           => if_PhaseShiftControl,
       dut_data                    => sig_axis_AdcData_MasterClk_tdata,
       dut_data_valid              => sig_axis_AdcData_MasterClk_tvalid);

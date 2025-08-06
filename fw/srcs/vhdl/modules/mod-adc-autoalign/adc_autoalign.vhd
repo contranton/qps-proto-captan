@@ -17,7 +17,7 @@
 -- Author     : Javier Contreras 52425N
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-07-11
--- Last update: 2025-08-01
+-- Last update: 2025-08-06
 -- Standard   : VHDL'08
 -------------------------------------------------------------------------------
 -- Description: Shifts data_clk until test pattern reads correctly. This routine
@@ -42,7 +42,8 @@ use work.autoalign_pkg.all;
 entity adc_autoalign is
 
   generic (
-    c_TEST_PATTERN : std_logic_vector(191 downto 0) := x"123456123456123456123456789ABC789ABC789ABC789ABC"
+    c_TEST_PATTERN : std_logic_vector(191 downto 0) := x"123456123456123456123456789ABC789ABC789ABC789ABC";
+    c_MAX_COUNT : natural := 1000 -- will depend on VCO freq.
     );
   port (
     clk               : in    std_logic;
@@ -60,6 +61,8 @@ architecture rtl of adc_autoalign is
   -- TODO: Resets
   -- TODO: autoalign_success (needs a fail condition -- timeout?)
 
+  subtype t_NDelays is integer range -c_MAX_COUNT to c_MAX_COUNT;
+
   type t_state is (IDLE, READ_DATA, MATCH_PATTERN, SHIFT_CLOCK, WAIT_SHIFT_DONE, ALGO_DONE);
   type t_direction is (BACKWARD, FORWARD);
   type t_edge_state is (NONE, FIRST, SECOND, EDGE_DONE);
@@ -71,13 +74,13 @@ architecture rtl of adc_autoalign is
   signal startup_case, startup_case_next : t_startup_case := STARTUP_UNMATCHED;
 
   -- Current number of delay steps
-  signal n_delays_current, n_delays_current_next : signed(15 downto 0) := to_signed(0, 16);
+  signal n_delays_current, n_delays_current_next : t_NDelays;
 
   -- Counters that store how many delays until rising/falling edge of stable regime
-  signal n_delays_until_first_edge      : signed(15 downto 0) := to_signed(0, 16);
-  signal n_delays_until_first_edge_next : signed(15 downto 0) := to_signed(0, 16);
-  signal n_delays_center                : signed(15 downto 0) := to_signed(0, 16);
-  signal n_delays_center_next           : signed(15 downto 0) := to_signed(0, 16);
+  signal n_delays_until_first_edge      : t_NDelays;
+  signal n_delays_until_first_edge_next : t_NDelays;
+  signal n_delays_center                : t_NDelays;
+  signal n_delays_center_next           : t_NDelays;
 
 
 begin  -- architecture rtl
@@ -92,9 +95,9 @@ begin  -- architecture rtl
         direction                 <= BACKWARD;
         edge                      <= NONE;
         startup_case              <= STARTUP_UNMATCHED;
-        n_delays_current          <= to_signed(0, 16);
-        n_delays_until_first_edge <= to_signed(0, 16);
-        n_delays_center           <= to_signed(0, 16);
+        n_delays_current          <= 0;
+        n_delays_until_first_edge <= 0;
+        n_delays_center           <= 0;
       else
         state        <= state_next;
         direction    <= direction_next;

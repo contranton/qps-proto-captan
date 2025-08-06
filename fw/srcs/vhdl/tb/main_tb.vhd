@@ -6,7 +6,7 @@
 -- Author     :   <javierc@correlator6.fnal.gov>
 -- Company    :
 -- Created    : 2025-07-11
--- Last update: 2025-07-15
+-- Last update: 2025-08-06
 -- Platform   :
 -- Standard   : VHDL'08
 -------------------------------------------------------------------------------
@@ -24,7 +24,9 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 
+use work.sim_pkg.all;
 use work.qps_pkg.all;
+use work.ads9813_pkg.all;
 
 -------------------------------------------------------------------------------
 
@@ -40,104 +42,68 @@ end entity main_tb;
 
 architecture sim of main_tb is
 
-  signal clk   : std_logic := '0';
-  signal reset : std_logic := '1';
+  constant c_FREQUENCY_SAMPLE_CLOCK : t_frequency_mhz     := 4.0;
+  constant c_DATA_LANES             : integer             := 4;
+  constant c_DATA_RATE              : t_ADS9813_DATA_RATE := 2;
 
-  -- component ports
-  signal adc_frame_clk  : std_logic;
-  signal adc_data_clk   : std_logic;
-  signal adc_spi_ctrl   : t_ADC_CTRL;
-  signal adc_data       : t_ADC_RAW_DATA(3 downto 0);
-  signal adc_pwdn_n     : std_logic;
-  signal adc_reset_n    : std_logic;
-  signal adc_sample_clk : std_logic;
-  signal USER_CLK1      : std_logic := '0';
-  signal user_led       : std_logic;
-  signal phy_rx         : t_GEL_PHY_RX;
-  signal phy_tx         : t_GEL_PHY_TX;
-  signal PHY_RESET      : std_logic;
+  signal USER_CLK1        : std_logic;
+  signal user_led         : std_logic;
+  signal clk_ADC_FRAME    : std_logic;
+  signal clk_ADC_DATA     : std_logic;
+  signal adc_data         : t_ADC_RAW_DATA(3 downto 0);
+  signal adc_pwdn_n       : std_logic;
+  signal adc_reset_n      : std_logic;
+  signal adc_spi_ctrl     : t_ADC_CTRL;
+  signal clk_ADC_SAMPLING : std_logic;
+  signal phy_rx           : t_GEL_PHY_RX;
+  signal phy_tx           : t_GEL_PHY_TX;
+  signal PHY_RESET        : std_logic;
 
-  -- signals for autoalign
-  signal deserializer_raw_data       : std_logic_vector(191 downto 0) := (others => '0');
-  signal deserializer_raw_data_valid : std_logic := '0';
-  signal trigger                     : std_logic := '0';
-  signal n_delays                    : signed(15 downto 0) := (others => '0');
-  signal autoalign_done              : std_logic := '0';
-  signal phase_shift_button_forward  : std_logic := '0';
-  signal phase_shift_button_backward : std_logic := '0';
-  signal phase_shift_done            : std_logic := '0';
+  signal reset_n      : std_logic;
+  signal pwdn_n       : std_logic;
+  signal sample_clock : std_logic;
+  signal spi_ctrl     : t_ADC_CTRL;
+  signal data_clock   : std_logic;
+  signal frame_clock  : std_logic;
+  signal d0           : std_logic;
+  signal d1           : std_logic;
+  signal d2           : std_logic;
+  signal d3           : std_logic;
 
-  -- signals for deserializer
+  begin
 
+  main_i: entity work.main
+    port map (
+      USER_CLK1        => USER_CLK1,
+      user_led         => user_led,
+      clk_ADC_FRAME    => clk_ADC_FRAME,
+      clk_ADC_DATA     => clk_ADC_DATA,
+      adc_data         => adc_data,
+      adc_pwdn_n       => adc_pwdn_n,
+      adc_reset_n      => adc_reset_n,
+      adc_spi_ctrl     => adc_spi_ctrl,
+      clk_ADC_SAMPLING => clk_ADC_SAMPLING,
+      phy_rx           => phy_rx,
+      phy_tx           => phy_tx,
+      PHY_RESET        => PHY_RESET);
 
-begin  -- architecture sim
-
-  -- component instantiation
-    DUT: entity work.main
-      generic map(
-        c_NUM_ADC_CHANNELS => 8
-      )
-      port map (
-        adc_frame_clk  => adc_frame_clk,
-        adc_data_clk   => adc_data_clk,
-        adc_spi_ctrl   => adc_spi_ctrl,
-        adc_data       => adc_data,
-        adc_pwdn_n     => adc_pwdn_n,
-        adc_reset_n    => adc_reset_n,
-        adc_sample_clk => adc_sample_clk,
-        USER_CLK1      => USER_CLK1,
-        user_led       => user_led,
-        phy_rx         => phy_rx,
-        phy_tx         => phy_tx,
-        PHY_RESET      => PHY_RESET);
-
-  ADC: entity work.ads9813_mockup
-    generic map(
-      c_FREQUENCY_SAMPLE_CLOCK => 4.0,
-      c_DATA_LANES => 4,
-      c_DATA_RATE => 2
-    )
-    port map(
+  ads9813_mockup_1: entity work.ads9813_mockup
+    generic map (
+      c_FREQUENCY_SAMPLE_CLOCK => c_FREQUENCY_SAMPLE_CLOCK,
+      c_DATA_LANES             => c_DATA_LANES,
+      c_DATA_RATE              => c_DATA_RATE)
+    port map (
+      reset_n      => reset_n,
+      pwdn_n       => pwdn_n,
+      sample_clock => clk_ADC_SAMPLING,
       spi_ctrl     => adc_spi_ctrl,
-      reset_n      => adc_reset_n,
-      pwdn_n       => adc_pwdn_n,
-      sample_clock => adc_sample_clk,
-      data_clock   => adc_data_clk,
-      frame_clock  => adc_frame_clk,
+      data_clock   => clk_ADC_DATA,
+      frame_clock  => clk_ADC_FRAME,
       d0           => adc_data(0),
       d1           => adc_data(1),
       d2           => adc_data(2),
       d3           => adc_data(3)
-    );
-
-  ti_deserializer : entity work.deser_cmos
-    port map(
-      CMOS_DIN_A        => adc_data(0),
-      CMOS_DIN_B        => adc_data(1),
-      CMOS_DIN_C        => adc_data(2),
-      CMOS_DIN_D        => adc_data(3),
-      DCLK              => adc_data_clk,
-      FCLK              => adc_frame_clk,
-      data_rate         => '0',         -- 0: DDR, 1: SDR
-      data_lanes        => "10",        -- 4 lanes
-      flip_ddr_polarity => '0',
-      RST               => reset,
-      DRDY              => deserializer_raw_data_valid,
-      DOUT              => deserializer_raw_data
       );
-
-  adc_autoalign_1: entity work.adc_autoalign
-    port map (
-      clk                         => adc_data_clk,
-      reset                       => reset,
-      deserializer_raw_data       => deserializer_raw_data,
-      deserializer_raw_data_valid => deserializer_raw_data_valid,
-      trigger                     => trigger,
-      n_delays                    => n_delays,
-      autoalign_done              => autoalign_done,
-      phase_shift_button_forward  => phase_shift_button_forward,
-      phase_shift_button_backward => phase_shift_button_backward,
-      phase_shift_done            => phase_shift_done);
 
   -- clock generation
   gen_clocks : process is
@@ -148,8 +114,9 @@ begin  -- architecture sim
 
 
   p_stop : process is
+    alias done is << signal .main_tb.main_i.if_AutoalignControl.done : std_logic>>;
     begin
-      wait until autoalign_done = '1';
+      wait until done = '1';
   end process p_stop;
 
 end architecture sim;

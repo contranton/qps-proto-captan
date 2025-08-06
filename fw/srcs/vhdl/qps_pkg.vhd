@@ -17,7 +17,7 @@
 -- Author     :   <javierc@correlator6.fnal.gov>
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-05-22
--- Last update: 2025-08-05
+-- Last update: 2025-08-06
 -- Standard   : VHDL'08
 -------------------------------------------------------------------------------
 -- Description: This package defines types for a simple DAQ system based on
@@ -62,13 +62,6 @@ package qps_pkg is
     ch8 : t_ADC_WORD;
   end record t_DESERIALIZER_OUTPUT;
 
-  type t_AUTOALIGN_CTRL_IF is record
-    trigger   : std_logic;
-    n_delays  : signed(15 downto 0);
-    start     : std_logic;
-    error_out : std_logic;
-    done      : std_logic;
-  end record t_AUTOALIGN_CTRL_IF;
 
   type t_ADC_CTRL is record
     SPI_EN : std_logic;
@@ -103,18 +96,6 @@ package qps_pkg is
     PhaseShiftForwardButton  : std_logic;
     PhaseShiftBackwardButton : std_logic;
   end record t_MB_GPIO;
-
-  type t_PHASE_SHIFT_IF is record
-    enable : std_logic;
-    incdec : std_logic;
-    done   : std_logic;
-  end record t_PHASE_SHIFT_IF;
-
-  type t_PHASE_SHIFT_CTRL_IF is record
-    button_forward  : std_logic;
-    button_backward : std_logic;
-    done            : std_logic;
-  end record t_PHASE_SHIFT_CTRL_IF;
 
   type t_ETHERNET_INTERFACE is record
     gel_reset_in  : std_logic;
