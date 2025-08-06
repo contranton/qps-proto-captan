@@ -6,7 +6,7 @@
 -- Author : <javierc@correlator6.fnal.gov>
 -- Company :
 -- Created : 2025-07-02
--- Last update: 2025-07-02
+-- Last update: 2025-08-06
 -- Platform :
 -- Standard : VHDL'08
 -------------------------------------------------------------------------------
@@ -22,15 +22,13 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use work.autoalign_pkg.all;
 
 entity phase_shift_ctrl is
   port (
-    clk             : in  std_logic;
-    forward_button  : in  std_logic;
-    backward_button : in  std_logic;
-    enable          : out std_logic;
-    incdec          : out std_logic;
-    done            : in  std_logic
+    clk                  : in    std_logic;
+    if_PhaseShiftCtrl : in    t_PHASE_SHIFT_CTRL_IF;
+    if_PhaseShift        : inout t_PHASE_SHIFT_IF
     );
 
 end entity phase_shift_ctrl;
@@ -40,6 +38,13 @@ architecture rtl of phase_shift_ctrl is
 
   type t_state is (PRESSED, RELEASED, SHIFT_DONE);
   signal state : t_state := RELEASED;
+
+  alias forward_button is if_PhaseShiftCtrl.button_forward;
+  alias backward_button is if_PhaseShiftCtrl.button_backward;
+
+  alias enable is if_PhaseShift.enable;
+  alias incdec is if_PhaseShift.incdec;
+  alias done is if_PhaseShift.done;
 
   signal button : std_logic;
 

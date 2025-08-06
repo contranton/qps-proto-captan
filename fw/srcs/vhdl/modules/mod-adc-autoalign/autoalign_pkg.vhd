@@ -56,7 +56,35 @@ package autoalign_pkg is
   type t_PHASE_SHIFT_CTRL_IF is record
     button_forward  : std_logic;
     button_backward : std_logic;
-    done            : std_logic;
+    done : std_logic;
   end record t_PHASE_SHIFT_CTRL_IF;
 
+  procedure proc_PhaseShiftCtrl_Merge(
+    signal master_1 : inout t_PHASE_SHIFT_CTRL_IF;
+    signal master_2 : inout t_PHASE_SHIFT_CTRL_IF;
+    signal slave : inout t_PHASE_SHIFT_CTRL_IF);
+
 end package autoalign_pkg;
+
+package body autoalign_pkg is
+
+  procedure proc_PhaseShiftCtrl_Merge(
+    signal master_1 : inout t_PHASE_SHIFT_CTRL_IF;
+    signal master_2 : inout t_PHASE_SHIFT_CTRL_IF;
+    signal slave : inout t_PHASE_SHIFT_CTRL_IF)
+  is
+  begin
+
+    slave.button_forward <= master_1.button_forward or
+                            master_2.button_forward;
+    slave.button_backward <= master_1.button_backward or
+                            master_2.button_backward;
+
+    master_1.done <= slave.done;
+    master_2.done <= slave.done;
+
+  end procedure proc_PhaseShiftCtrl_Merge;
+
+
+
+end package body autoalign_pkg;

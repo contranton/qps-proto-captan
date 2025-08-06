@@ -35,6 +35,8 @@ use work.ads9813_pkg.all;
 use work.register_space_pkg.all;
 use work.autoalign_pkg.all;
 
+use work.pkg_AdcTopLevelFunctions_BufferQueue.all;
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -47,7 +49,7 @@ use xpm.vcomponents.all;
 
 entity main is
   generic (
-    constant c_DEBUG_ENABLE       : std_logic := '1';
+    constant c_DEBUG_ENABLE       : std_logic := '0';
     constant c_USE_MICROBLAZE_SPI : std_logic := '0'
     );
   port (
@@ -92,11 +94,11 @@ architecture rtl of main is
   -- </.>
 
   -- <Outgoing clocks>
-  signal clk_ADC_SAMPLING_4MHZ         : std_logic := '0';
-  signal clk_ADC_SAMPLING_16MHZ_prebuf : std_logic := '0';
-  signal clk_ADC_SAMPLING_8MHZ         : std_logic := '0';
-  signal clk_ADC_SAMPLING_16MHZ        : std_logic := '0';
-  signal clk_PHY_TX_prebuf            : std_logic := '0';
+  signal clk_ADC_SAMPLING_prebuf : std_logic := '0';
+  signal clk_ADC_SAMPLING_4MHZ   : std_logic := '0';
+  signal clk_ADC_SAMPLING_8MHZ   : std_logic := '0';
+  signal clk_ADC_SAMPLING_16MHZ  : std_logic := '0';
+  signal clk_PHY_TX_prebuf       : std_logic := '0';
   -- </.>
 
 
@@ -108,9 +110,11 @@ architecture rtl of main is
 --
 
   -- <PLL phase shift Interface>
-  signal if_PhaseShiftControl    : t_PHASE_SHIFT_CTRL_IF;
-  signal if_PhaseShift           : t_PHASE_SHIFT_IF;
-  signal if_PhaseShift_done_sync : std_logic;
+  signal if_PhaseShiftCtrl            : t_PHASE_SHIFT_CTRL_IF;
+  signal if_PhaseShiftCtrl_Autoalign  : t_PHASE_SHIFT_CTRL_IF;
+  signal if_PhaseShiftCtrl_Microblaze : t_PHASE_SHIFT_CTRL_IF;
+  signal if_PhaseShift            : t_PHASE_SHIFT_IF;
+  signal if_PhaseShift_done_sync  : std_logic;
   -- </.>
 
   -- <Ethernet Interface>
@@ -123,7 +127,7 @@ architecture rtl of main is
   -- </.>
 
   -- <ADC autoaligner>
-  signal if_AutoalignControl : t_AUTOALIGN_CTRL_IF;
+  signal if_AutoalignCtrl             : t_AUTOALIGN_CTRL_IF;
 
   -- <SPI interfaces>
   signal if_AdcSpiCtrl_Microblaze : t_ADC_CTRL;
@@ -133,6 +137,8 @@ architecture rtl of main is
 
   -- <ADS9813 configuration interface>
   signal if_Ads9813: t_Ads9813;
+  signal sig_Ads9813_BufferFunctions : t_arr_ADS9813_SPI_FUNCTIONS(0 to 8);
+  signal sig_Ads9813_Pointer : integer range 0 to 8;
 
   signal if_AdcUserConfig : t_ADC_USER_CONFIG :=
     (
@@ -155,15 +161,15 @@ architecture rtl of main is
   -- <AXIS : Deserializer -- CDC FIFO>
   --  CDC crossing from ADC clock domain to PHY clock domain
   signal sig_axis_AdcData_AdcClk_tdata        : std_logic_vector(c_MSB-1 downto 0);
-  signal sig_axis_AdcData_AdcClk_tready       : std_logic := '1';
+  signal sig_axis_AdcData_AdcClk_tready       : std_logic;
   signal sig_axis_AdcData_AdcClk_tvalid       : std_logic;
   signal sig_axis_AdcData_AdcClk_tvalid_pulse : std_logic;
   -- </.>
 
   -- <AXIS : CDC FIFO -- Sequencer>
   -- FIFO output fed into sequencer
-  signal sig_axis_AdcData_MasterClk_tvalid : std_logic := '0';
-  signal sig_axis_AdcData_MasterClk_tready : std_logic := '1';
+  signal sig_axis_AdcData_MasterClk_tvalid : std_logic;
+  signal sig_axis_AdcData_MasterClk_tready : std_logic;
   signal sig_axis_AdcData_MasterClk_tdata  : std_logic_vector(c_MSB-1 downto 0);
   -- </.>
 
@@ -177,7 +183,7 @@ architecture rtl of main is
   -- Packed output of sequencer to which timestamp is added
   signal sig_axis_PacketizedData_MasterClk_tdata  : std_logic_vector(63 downto 0);
   signal sig_axis_PacketizedData_MasterClk_tvalid : std_logic;
-  signal sig_axis_PacketizedData_MasterClk_tready : std_logic := '1';
+  signal sig_axis_PacketizedData_MasterClk_tready : std_logic;
   -- </.>
 
   -- Data timestamp. At 150MHz clk_MAIN, 1 LSB = 6.66ns
@@ -252,17 +258,17 @@ architecture rtl of main is
   signal clk_ADC_DATA_buf4cdc    : std_logic := '0';
 
   -- VIO signals
-  signal vio_out_PhaseShiftBackwardButton : std_logic := '0';
-  signal vio_out_PhaseShiftForwardButton  : std_logic := '0';
-  signal vio_out_ClkWizPhaseShiftReset    : std_logic := '0';
-  signal vio_in_ClkWizPhaseShiftLocked    : std_logic := '0';
-  signal vio_out_SampleRateSelect         : std_logic := '0';
-  signal vio_out_Reset                    : std_logic := '0';
-  signal vio_out_FlipDdrPolarity          : std_logic := '1';
-  signal vio_out_FlipDdrPolarity_sync     : std_logic := '1';
-  signal vio_out_PhyResetSig              : std_logic := '1';
-  signal vio_out_PhyResetSig_sync         : std_logic := '1';
-  signal vio_out_EthDataGenEnable         : std_logic := '0';
+  signal vio_out_PhaseShiftBackwardButton : std_logic;
+  signal vio_out_PhaseShiftForwardButton  : std_logic;
+  signal vio_out_ClkWizPhaseShiftReset    : std_logic;
+  signal vio_in_ClkWizPhaseShiftLocked    : std_logic;
+  signal vio_out_SampleRateSelect         : std_logic;
+  signal vio_out_Reset                    : std_logic;
+  signal vio_out_FlipDdrPolarity          : std_logic;
+  signal vio_out_FlipDdrPolarity_sync     : std_logic;
+  signal vio_out_PhyResetSig              : std_logic;
+  signal vio_out_PhyResetSig_sync         : std_logic;
+  signal vio_out_EthDataGenEnable         : std_logic;
 
   -- Sequencer data Input
   -- Splits large std_logic_vector into per_channel ADC words
@@ -289,7 +295,14 @@ begin
     begin
       if rising_edge(clk_MAIN) then
        if stat_QpsStatus.AdcHasBeenInitialized = '0' then
-         if_Ads9813.FunctionAddress <= en_FUNCTION_INIT;
+         proc_BufferPush(
+           sig_Ads9813_BufferFunctions,
+           sig_Ads9813_Pointer,
+           en_FUNCTION_INIT
+        );
+         -- TODO: Deprecate the triggerTx/triggerRx in favor of the module
+         --if_Ads9813.FunctionAddress <= en_FUNCTION_INIT;
+         -- automatically noticing `pointer > 0`
          if_Ads9813.triggerTx <= '1';
         end if;
       end if;
@@ -302,7 +315,7 @@ begin
       clk_in_100  => USER_CLK1,
       clk_out_200 => clk_FAST,
       clk_out_150 => clk_MAIN,
-      clk_out_16  => clk_ADC_SAMPLING_16MHZ_prebuf
+      clk_out_16  => clk_ADC_SAMPLING_16MHZ
       );
 
   pll_PhyClock : entity work.clk_wiz_phy2adc
@@ -330,7 +343,7 @@ begin
 
   -- Mux sample clock
   with ctrl_SampleRateSelect select
-    clk_ADC_SAMPLING <= clk_ADC_SAMPLING_8MHZ when '1',
+    clk_ADC_SAMPLING_prebuf <= clk_ADC_SAMPLING_8MHZ when '1',
                       clk_ADC_SAMPLING_4MHZ when '0',
                       '0'                 when others;
   -- </.> --
@@ -365,6 +378,7 @@ begin
         if_AdcUserConfig => if_AdcUserConfig,
         if_Spi           => if_SpiHdlManager);
 
+
   else generate
     adc_spi_ctrl <= if_AdcSpiCtrl_Microblaze;
 
@@ -379,22 +393,25 @@ begin
         gpio_rtl_0_tri_o => if_MbGpioRaw
         );
 
-    if_MbGpio.PhaseShiftForwardButton  <= if_MbGpioRaw(0);
-    if_MbGpio.PhaseShiftBackwardButton <= if_MbGpioRaw(1);
+    if_PhaseShiftCtrl_Microblaze.button_forward <= if_MbGpioRaw(0);
+    if_PhaseShiftCtrl_Microblaze.button_backward <= if_MbGpioRaw(1);
 
   end generate gen_Spi;
   -- </.>
 
   -- <Phase shift control for ADC DCLK>
-  mod_PhaseShiftControl : entity work.phase_shift_ctrl
+  proc_PhaseShiftCtrl_Merge(
+    master_1 => if_PhaseShiftCtrl_Microblaze,
+    master_2 => if_PhaseShiftCtrl_Autoalign,
+    slave    => if_PhaseShiftCtrl
+  );
+
+  mod_PhaseShiftCtrl : entity work.phase_shift_ctrl
     -- Handles phase_shift buttons
     port map(
-      clk             => clk_MAIN,
-      forward_button  => ctrl_PhaseShiftForwardButton,
-      backward_button => ctrl_PhaseShiftBackwardButton,
-      enable          => if_PhaseShift.enable,
-      incdec          => if_PhaseShift.incdec,
-      done            => if_PhaseShift.done
+      clk               => clk_MAIN,
+      if_PhaseShiftCtrl => if_PhaseShiftCtrl,
+      if_PhaseShift     => if_PhaseShift
       );
 
   pll_PhaseShift : entity work.clk_wiz_phase_shift
@@ -409,7 +426,7 @@ begin
       reset         => vio_out_ClkWizPhaseShiftReset,
       locked        => vio_in_ClkWizPhaseShiftLocked
       );
-  if_PhaseShiftControl.done <= if_PhaseShift.done;
+  if_PhaseShiftCtrl.done <= if_PhaseShift.done;
   -- </.>
 
   -- <ADC Autoaligners>
@@ -417,21 +434,29 @@ begin
     begin
       if rising_edge(clk_MAIN) then
         if stat_QpsStatus.AdcDataIsAligned = '0' then
-          if if_AutoalignControl.done = '1' then
+          if if_AutoalignCtrl.done = '1' then
             stat_QpsStatus.AdcDataIsAligned <= '1';
-            if_Ads9813.FunctionAddress <= en_FUNCTION_DISABLE_TEST;
-            if_Ads9813.triggerTx <= '1';
+            proc_BufferPush(
+              sig_Ads9813_BufferFunctions,
+              sig_Ads9813_Pointer,
+              en_FUNCTION_DISABLE_TEST
+            );
+            -- if_Ads9813.FunctionAddress <= en_FUNCTION_DISABLE_TEST;
+            -- if_Ads9813.triggerTx <= '1';
           end if;
         end if;
       end if;
   end process p_SendSpiDisableTestPattern;
 
+  -- TODO: Change this to not use the vio signal
+  -- Start autoalign on first lock of PLL
+  if_AutoalignCtrl.start <= vio_in_ClkWizPhaseShiftLocked;
   mod_Autoalign : entity work.adc_autoalign
     port map (
       clk                         => clk_MAIN,
       reset                       => reset,
-      if_AutoAlignCtrl            => if_AutoalignControl,
-      if_PhaseShiftCtrl           => if_PhaseShiftControl,
+      if_AutoAlignCtrl            => if_AutoalignCtrl,
+      if_PhaseShiftCtrl           => if_PhaseShiftCtrl_Autoalign,
       dut_data                    => sig_axis_AdcData_MasterClk_tdata,
       dut_data_valid              => sig_axis_AdcData_MasterClk_tvalid);
   -- </.>
@@ -608,10 +633,10 @@ begin
   -- </.>
 
   -- <Output Buffers>
-  obuf_SampleClock : OBUF
-    port map (
-      I => clk_ADC_SAMPLING_16MHZ_prebuf,
-      O => clk_ADC_SAMPLING_16MHZ);
+  obuf_SamplingClock : OBUF
+    port map(
+      I => clk_ADC_SAMPLING_prebuf,
+      O => clk_ADC_SAMPLING);
 
   obuf_PhyReset : OBUF
     port map(
@@ -632,8 +657,7 @@ begin
 
   gen_Debug : if c_DEBUG_ENABLE = '0' generate
 
-    ctrl_PhaseShiftBackwardButton <= if_MbGpio.PhaseShiftBackwardButton;
-    ctrl_PhaseShiftForwardButton  <= if_MbGpio.PhaseShiftForwardButton;
+
     ctrl_FlipDdrPolarity          <= '1';
     ctrl_EthDataGenEnable         <= '0';
     ctrl_SampleRateSelect         <= '0';
@@ -651,8 +675,6 @@ begin
     -- Allow operation from both VIO and MB
     ctrl_EthDataGenEnable         <= vio_out_EthDataGenEnable;
     ctrl_FlipDdrPolarity          <= vio_out_FlipDdrPolarity_sync;
-    ctrl_PhaseShiftBackwardButton <= vio_out_PhaseShiftBackwardButton or if_MbGpio.PhaseShiftBackwardButton;
-    ctrl_PhaseShiftForwardButton  <= vio_out_PhaseShiftForwardButton or if_MbGpio.PhaseShiftForwardButton;
     ctrl_SampleRateSelect         <= vio_out_SampleRateSelect;
     if_Ethernet.gel_reset_in      <= vio_out_PhyResetSig_sync;
 

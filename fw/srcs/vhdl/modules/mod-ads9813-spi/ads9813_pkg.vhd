@@ -17,7 +17,7 @@
 -- Author     :   <javierc@correlator6.fnal.gov>
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-07-30
--- Last update: 2025-08-05
+-- Last update: 2025-08-06
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
 -- Description: Commaands and state management for SPI interface
@@ -44,6 +44,9 @@ package ads9813_pkg is
     en_FUNCTION_SET_VOLT_SCALE,
     en_FUNCTION_SET_TEST_PATTERN
     );
+
+  -- Array type used for function buffer
+  type t_arr_ADS9813_SPI_FUNCTIONS is array(natural range <>) of t_enum_ADS9813_SPI_FUNCTIONS;
 
   type t_enum_ADS9813_VOLT_SCALES is (
     en_VOLTSCALE_5V0,
@@ -126,7 +129,11 @@ package ads9813_pkg is
 
 end package ads9813_pkg;
 
-package body ads9813_pkg is
-
-
-end package body ads9813_pkg;
+-- TODO: This shouldn't belong here. It makes it awkward since the top-level has
+-- to use both ads9813_pkg and pkg_Adc...BufferQueue
+package pkg_AdcTopLevelFunctions_BufferQueue is new work.pkg_BufferQueue
+  generic map(
+    t_TYPE => t_enum_ADS9813_SPI_FUNCTIONS,
+    t_arr_TYPE => t_arr_ADS9813_SPI_FUNCTIONS(0 to 8),
+    t_POINTER => integer
+);

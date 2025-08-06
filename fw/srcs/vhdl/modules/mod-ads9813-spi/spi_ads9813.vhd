@@ -17,7 +17,7 @@
 -- Author     : Javier Contreras 52425N
 -- Division   : CSAID/RTPS/DIS
 -- Created    : 2025-07-29
--- Last update: 2025-08-05
+-- Last update: 2025-08-06
 -- Standard   : VHDL'08
 -------------------------------------------------------------------------------
 -- Description: Generates SPI transactions for ADC configuration. TX Only
@@ -28,6 +28,14 @@
 -- Date        Version  Author  Description
 -- 2025-07-29  1.0      javierc     Created
 -------------------------------------------------------------------------------
+
+use work.ads9813_pkg.all;
+package pkg_Ads9813_BufferQueue is new work.pkg_BufferQueue
+  generic map(
+    t_TYPE => t_rec_SPI_TX_WORD,
+    t_arr_TYPE => t_arr_SPI_TX_BUFFER,
+    t_POINTER => t_POINTER
+);
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -85,26 +93,6 @@ architecture rtl of SpiController_ADS9813 is
 
   end procedure proc_BufferTx;
 
-  procedure proc_BufferPush(
-    signal arg_Buffer  : inout t_arr_SPI_TX_BUFFER;
-    signal arg_Pointer : inout t_POINTER;
-    constant arg_Data  : in    t_rec_SPI_TX_WORD
-    ) is
-  begin
-    arg_Pointer             <= arg_Pointer + 1;
-    arg_Buffer(arg_Pointer) <= arg_Data;
-  end procedure proc_BufferPush;
-
-  procedure proc_BufferReset(
-    signal arg_Buffer  : inout t_arr_SPI_TX_BUFFER;
-    signal arg_Pointer : out   t_POINTER
-    ) is
-  begin
-    for idx in 0 to arg_Buffer'length - 1 loop
-      arg_Buffer(idx) <= (address => x"00", data => x"0000");
-    end loop;
-    arg_Pointer <= 0;
-  end procedure proc_BufferReset;
 
 begin  -- architecture rtl
 
