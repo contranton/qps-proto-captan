@@ -7,7 +7,7 @@
 #define DO_TEST_PATTERN_RAMP 0
 #define DO_TEST_PATTERN_FIXED 0
 
-//#define DO_PHASE_SHIFT
+// #define DO_PHASE_SHIFT
 #define PHASE_SHIFT_BACKWARDS 1
 #define PHASE_SHIFT 15.0 /* Deg */
 
@@ -77,7 +77,7 @@ int main(void) {
 #ifdef DO_PHASE_SHIFT
   // COnfigure Phase Shifter
   xil_printf("Will phase shift %s %i steps (%0.1f deg)\r\n",
-		  	  PHASE_SHIFT_BACKWARDS == 1 ? "forward" : "backward",
+             PHASE_SHIFT_BACKWARDS == 1 ? "forward" : "backward",
              PHASE_SHIFT_STEPS, PHASE_SHIFT);
   for (int i = 0; i < PHASE_SHIFT_STEPS; i++) {
     if (PHASE_SHIFT_BACKWARDS)
@@ -146,8 +146,8 @@ int spi_program_adc(XSpi *inst) {
   SPI_WRITE(SPI_COMMAND_B1_DOUBLE_DATA_RATE);
 
   // Configure voltage ranges
-  SPI_WRITE(SPI_COMMAND_B1_CH1_TO_CH4_RANGE_7V0);
-  SPI_WRITE(SPI_COMMAND_B1_CH5_TO_CH8_RANGE_7V0);
+  SPI_WRITE(SPI_COMMAND_B1_CH1_TO_CH4_RANGE_5V0);
+  SPI_WRITE(SPI_COMMAND_B1_CH5_TO_CH8_RANGE_5V0);
 
   // Enable digital ramp test pattern
   if (DO_TEST_PATTERN_RAMP) {
